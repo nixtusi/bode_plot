@@ -34,6 +34,25 @@ struct Complex: Equatable {
     func phaseDeg() -> Double { atan2(im, re) * 180.0 / .pi }
 }
 
+extension Complex {
+    func exp() -> Complex {
+        // exp(a+jb)=exp(a)(cos b + j sin b)
+        let ea = Foundation.exp(re)
+        return Complex(re: ea * cos(im), im: ea * sin(im))
+    }
+
+    func log() -> Complex {
+        // principal value log(z)=ln|z| + j arg(z)
+        return Complex(re: Foundation.log(self.abs()), im: atan2(im, re))
+    }
+
+    func pow(_ p: Double) -> Complex {
+        // z^p = exp(p * log(z))  (principal branch)
+        let l = self.log()
+        return Complex(re: l.re * p, im: l.im * p).exp()
+    }
+}
+
 // =====================================================
 //  Bodeモデル
 // =====================================================
@@ -98,6 +117,32 @@ enum BodeCalc {
             let n = evalPoly(numHighFirst, at: s)
             let d = evalPoly(denHighFirst, at: s)
             let h = n / d
+
+            mags.append(20.0 * log10(h.abs()))
+            phases.append(h.phaseDeg())
+        }
+
+        let unwrapped = unwrapPhaseDeg(phases)
+
+        return zip(zip(ws, mags), unwrapped).map { pair, ph in
+            let (w, magDB) = pair
+            return BodePoint(w: w, logW: log10(w), magDB: magDB, phaseDeg: ph)
+        }
+    }
+
+    static func bodeEval(wStartExp: Double, wEndExp: Double, points: Int,
+                         eval: (Complex) -> Complex) -> [BodePoint] {
+
+        let ws = logspace(startExp: wStartExp, endExp: wEndExp, count: points)
+
+        var mags: [Double] = []
+        var phases: [Double] = []
+        mags.reserveCapacity(ws.count)
+        phases.reserveCapacity(ws.count)
+
+        for w in ws {
+            let s = Complex(re: 0, im: w) // jω
+            let h = eval(s)
 
             mags.append(20.0 * log10(h.abs()))
             phases.append(h.phaseDeg())
@@ -235,7 +280,7 @@ struct Rational {
     }
 
     func pow(_ e: Int) throws -> Rational {
-        if e < 0 { throw ParseError.message("^ は 0以上の整数だけ対応") }
+        if e < 0 { throw ParseError.message("^は0以上の整数だけ対応") }
         return try Rational(num: polyPow(num, e), den: polyPow(den, e))
     }
 
@@ -507,6 +552,222 @@ final class Parser {
 }
 
 // =====================================================
+//  Complex式をそのまま評価する（非整数冪OK）パーサ
+//  対応: + - * / ^(実数), 暗黙積, ( ), s, sqrt(x)
+// =====================================================
+
+indirect enum CExpr {
+    case num(Double)
+    case s
+    case add(CExpr, CExpr)
+    case sub(CExpr, CExpr)
+    case mul(CExpr, CExpr)
+    case div(CExpr, CExpr)
+    case pow(CExpr, Double)
+    case neg(CExpr)
+    case sqrt(CExpr)
+
+    func eval(_ sVal: Complex) -> Complex {
+        switch self {
+        case .num(let v): return Complex(re: v, im: 0)
+        case .s: return sVal
+        case .add(let a, let b): return a.eval(sVal) + b.eval(sVal)
+        case .sub(let a, let b): return a.eval(sVal) + Complex(re: -b.eval(sVal).re, im: -b.eval(sVal).im)
+        case .mul(let a, let b): return a.eval(sVal) * b.eval(sVal)
+        case .div(let a, let b): return a.eval(sVal) / b.eval(sVal)
+        case .neg(let x):
+            let v = x.eval(sVal)
+            return Complex(re: -v.re, im: -v.im)
+        case .pow(let base, let p):
+            return base.eval(sVal).pow(p)
+        case .sqrt(let x):
+            return x.eval(sVal).pow(0.5)
+        }
+    }
+}
+
+final class ComplexExprParser {
+    private var tokens: [Token] = []
+    private var pos: Int = 0
+
+    init(_ expr: String) throws {
+        var lx = Lexer(expr)
+        var t: Token = try lx.nextToken()
+        while t != .end {
+            tokens.append(t)
+            t = try lx.nextToken()
+        }
+        tokens.append(.end)
+    }
+
+    private func peek() -> Token { tokens[pos] }
+    private func advance() { pos = min(pos + 1, tokens.count - 1) }
+
+    private func matchOp(_ c: Character) -> Bool {
+        if case .op(let x) = peek(), x == c { advance(); return true }
+        return false
+    }
+
+    private func isImplicitMulStart(_ t: Token) -> Bool {
+        switch t {
+        case .number, .ident, .lparen:
+            return true
+        default:
+            return false
+        }
+    }
+
+    func parse() throws -> CExpr {
+        let e = try parseExpression()
+        if peek() != .end { throw ParseError.message("式の後ろに余計なものがある") }
+        return e
+    }
+
+    // expression := term { (+|-) term }
+    private func parseExpression() throws -> CExpr {
+        var lhs = try parseTerm()
+        while true {
+            if matchOp("+") {
+                let rhs = try parseTerm()
+                lhs = .add(lhs, rhs)
+            } else if matchOp("-") {
+                let rhs = try parseTerm()
+                lhs = .sub(lhs, rhs)
+            } else { break }
+        }
+        return lhs
+    }
+
+    // term := power { (*|/|implicitMul) power }
+    private func parseTerm() throws -> CExpr {
+        var lhs = try parsePower()
+        while true {
+            if matchOp("*") {
+                let rhs = try parsePower()
+                lhs = .mul(lhs, rhs)
+            } else if matchOp("/") {
+                let rhs = try parsePower()
+                lhs = .div(lhs, rhs)
+            } else if isImplicitMulStart(peek()) {
+                let rhs = try parsePower()
+                lhs = .mul(lhs, rhs)
+            } else { break }
+        }
+        return lhs
+    }
+
+    // power := unary { ^ realConst }
+    // realConst は 例: 2, -1, 0.5, ( -1/2 ) みたいな「実数定数式」
+    private func parsePower() throws -> CExpr {
+        var base = try parseUnary()
+        while matchOp("^") {
+            let p = try parseRealConst()
+            base = .pow(base, p)
+        }
+        return base
+    }
+
+    private func parseUnary() throws -> CExpr {
+        if matchOp("+") { return try parseUnary() }
+        if matchOp("-") { return .neg(try parseUnary()) }
+        return try parsePrimary()
+    }
+
+    private func parsePrimary() throws -> CExpr {
+        switch peek() {
+        case .number(let v):
+            advance()
+            return .num(v)
+
+        case .ident(let name):
+            advance()
+            let lower = name.lowercased()
+
+            if lower == "s" { return .s }
+
+            // sqrt(x) だけサポート（必要なら exp/log も増やせる）
+            if lower == "sqrt" {
+                guard peek() == .lparen else { throw ParseError.message("sqrt の後ろは ( ) が必要") }
+                advance()
+                let arg = try parseExpression()
+                if peek() != .rparen { throw ParseError.message(") が足りない") }
+                advance()
+                return .sqrt(arg)
+            }
+
+            throw ParseError.message("使える変数は s、関数は sqrt() のみ（今: \(name)）")
+
+        case .lparen:
+            advance()
+            let e = try parseExpression()
+            if peek() != .rparen { throw ParseError.message(") が足りない") }
+            advance()
+            return e
+
+        case .end:
+            throw ParseError.message("有効な式を入力して下さい。")
+        default:
+            throw ParseError.message("式として読めないトークン: \(peek())")
+        }
+    }
+
+    // ---- ここから「実数定数式」だけ読む（sは禁止） ----
+    private func parseRealConst() throws -> Double {
+        if peek() == .lparen {
+            advance()
+            let v = try parseRealExpr()
+            if peek() != .rparen { throw ParseError.message(") が足りない（指数）") }
+            advance()
+            return v
+        }
+        return try parseRealExpr()
+    }
+
+    private func parseRealExpr() throws -> Double {
+        var lhs = try parseRealTerm()
+        while true {
+            if matchOp("+") { lhs += try parseRealTerm() }
+            else if matchOp("-") { lhs -= try parseRealTerm() }
+            else { break }
+        }
+        return lhs
+    }
+
+    private func parseRealTerm() throws -> Double {
+        var lhs = try parseRealUnary()
+        while true {
+            if matchOp("*") { lhs *= try parseRealUnary() }
+            else if matchOp("/") { lhs /= try parseRealUnary() }
+            else { break }
+        }
+        return lhs
+    }
+
+    private func parseRealUnary() throws -> Double {
+        if matchOp("+") { return try parseRealUnary() }
+        if matchOp("-") { return -(try parseRealUnary()) }
+        return try parseRealPrimary()
+    }
+
+    private func parseRealPrimary() throws -> Double {
+        switch peek() {
+        case .number(let v):
+            advance(); return v
+        case .lparen:
+            advance()
+            let v = try parseRealExpr()
+            if peek() != .rparen { throw ParseError.message(") が足りない（指数）") }
+            advance()
+            return v
+        case .ident:
+            throw ParseError.message("指数に s は使えない（指数は実数定数だけ）")
+        default:
+            throw ParseError.message("指数が読めない")
+        }
+    }
+}
+
+// =====================================================
 //  UI（式入力 → 係数化 → Bode）
 // =====================================================
 struct ContentView: View {
@@ -641,6 +902,14 @@ struct ContentView: View {
                             }
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
+                        
+                        Button {
+                            resetAdvancedSettings()
+                        } label: {
+                            Label("設定をリセット", systemImage: "arrow.counterclockwise")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
                     }
 
                     BodeChartsView(
@@ -648,6 +917,11 @@ struct ContentView: View {
                         wStartExp: min(wStartExp, wEndExp - 0.5),
                         wEndExp: max(wEndExp, wStartExp + 0.5)
                     )
+                    
+                    Text("※これらの図は片対数グラフであり、横軸は角周波数wを対数目盛(logw)で取っています。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 6)
                 }
                 .padding()
             }
@@ -683,17 +957,18 @@ struct ContentView: View {
         lastNum = []
         lastDen = []
 
+        // start < end を保証
+        let start = min(wStartExp, wEndExp - 0.5)
+        let end = max(wEndExp, wStartExp + 0.5)
+
         do {
+            // ---- まずは従来の「係数化」ルート（整数冪向け） ----
             let parser = try Parser(exprText)
             let r = try parser.parse()
             let coeffs = r.toHighFirstCoeffs()
 
             lastNum = coeffs.num
             lastDen = coeffs.den
-
-            // start < end を保証
-            let start = min(wStartExp, wEndExp - 0.5)
-            let end = max(wEndExp, wStartExp + 0.5)
 
             let raw = BodeCalc.bode(
                 numHighFirst: coeffs.num,
@@ -703,19 +978,44 @@ struct ContentView: View {
                 points: Int(points)
             )
 
-            // ✅ NaN / inf を除外（Chartsが描けなくなるのを防ぐ）
-            bodeData = raw.filter { p in
-                p.logW.isFinite && p.magDB.isFinite && p.phaseDeg.isFinite
-            }
-
+            bodeData = raw.filter { $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite }
             if bodeData.isEmpty {
                 errorMessage = "計算結果が NaN/∞ になってるっぽい（式や周波数範囲を確認してね）"
             }
-            
+            return
+
         } catch {
-            bodeData = []
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            // ---- ダメなら「直接評価」ルート（非整数冪OK） ----
+            do {
+                let p2 = try ComplexExprParser(exprText)
+                let expr = try p2.parse()
+
+                lastNum = []
+                lastDen = []
+
+                let raw = BodeCalc.bodeEval(
+                    wStartExp: start,
+                    wEndExp: end,
+                    points: Int(points)
+                ) { s in
+                    expr.eval(s)
+                }
+
+                bodeData = raw.filter { $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite }
+                if bodeData.isEmpty {
+                    errorMessage = "計算結果が NaN/∞ になっています（式や周波数範囲を確認して下さい）"
+                }
+            } catch {
+                bodeData = []
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+            }
         }
+    }
+    
+    private func resetAdvancedSettings() {
+        wStartExp = -2
+        wEndExp = 2
+        points = 1000
     }
 }
 
@@ -744,7 +1044,7 @@ struct BodeChartsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             
-            GroupBox("ゲイン線図　x:logw, y:20log|G(jw)|[dB]") {
+            GroupBox("ゲイン線図　x:w, y:20log|G(jw)|[dB]") {
                 Chart(sorted) { p in
                     LineMark(
                         x: .value("logW", p.logW),
@@ -758,7 +1058,7 @@ struct BodeChartsView: View {
                 .chartYAxis { AxisMarks(position: .leading) }
             }
             
-            GroupBox("位相線図　x:logw, y:∠G(jw)[deg]") {
+            GroupBox("位相線図　x:w, y:∠G(jw)[deg]") {
                 Chart(sorted) { p in
                     LineMark(
                         x: .value("logW", p.logW),
@@ -790,10 +1090,21 @@ struct BodeChartsView: View {
     @AxisContentBuilder
     private func bodeXAxis(startExp: Double, endExp: Double) -> some AxisContent {
         let step = 1.0
-        let start = floor(startExp)
-        let end = ceil(endExp)
-        
-        AxisMarks(values: stride(from: start, through: end, by: step).map { $0 }) { value in
+
+        // domainの内側に入る整数だけ（ResultBuilder対策でクロージャ化）
+        let exps: [Double] = {
+            let start = ceil(startExp)
+            let end = floor(endExp)
+
+            if start > end {
+                // 1 decade未満で整数が入らないときは中央に1個だけ
+                return [round((startExp + endExp) * 0.5)]
+            } else {
+                return stride(from: start, through: end, by: step).map { $0 }
+            }
+        }()
+
+        AxisMarks(values: exps) { value in
             AxisGridLine()
             AxisTick()
             AxisValueLabel {
@@ -817,3 +1128,5 @@ struct BodeChartsView: View {
         return "10" + superscriptInt(e)   // 10⁻¹ みたいになる
     }
 }
+
+
