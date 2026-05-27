@@ -1,0 +1,436 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "^ must be followed by an integer (e.g. ^2)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "^ の後ろは整数 (例: ^2) のみ対応しています"
+          }
+        }
+      }
+    },
+    "^ only supports non-negative integer exponents" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "^ は 0 以上の整数だけ対応しています"
+          }
+        }
+      }
+    },
+    "^ only supports non-negative integers (got: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "^ は 0 以上の整数のみ対応 (今: %@)"
+          }
+        }
+      }
+    },
+    "Add Expression" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "式を追加"
+          }
+        }
+      }
+    },
+    "Advanced Settings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細設定"
+          }
+        }
+      }
+    },
+    "Bode Plot" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ボード線図"
+          }
+        }
+      }
+    },
+    "Cannot read exponent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指数が読めません"
+          }
+        }
+      }
+    },
+    "Cannot read number: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数値が読めません: %@"
+          }
+        }
+      }
+    },
+    "Cannot use 's' in exponent (must be a real constant)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指数に s は使えません (指数は実数定数のみ)"
+          }
+        }
+      }
+    },
+    "Clear All" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全クリア"
+          }
+        }
+      }
+    },
+    "Delete" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除"
+          }
+        }
+      }
+    },
+    "Denominator is zero" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分母が 0 になっています"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        }
+      }
+    },
+    "End 10^" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終了 10^"
+          }
+        }
+      }
+    },
+    "Enjoying Bode Plot?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリは気に入りましたか？"
+          }
+        }
+      }
+    },
+    "Enter a transfer function above to plot its Bode diagram here" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上の入力欄に伝達関数を入力するとここにボード線図が表示されます"
+          }
+        }
+      }
+    },
+    "Frequency Range (rad/s)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周波数範囲 (rad/s)"
+          }
+        }
+      }
+    },
+    "Horizontal axis is angular frequency ω on a logarithmic scale (log₁₀ω)." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "横軸は角周波数 ω の対数目盛 (log₁₀ω) で表示しています。"
+          }
+        }
+      }
+    },
+    "If you find this app useful, please consider leaving a review on the App Store. It really helps!" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もしよろしければ、App Store でレビューを書いていただけると励みになります。"
+          }
+        }
+      }
+    },
+    "Invalid character: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不正な文字: %@"
+          }
+        }
+      }
+    },
+    "logW" : {
+
+    },
+    "Mag(dB)" : {
+
+    },
+    "Magnitude" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲイン線図"
+          }
+        }
+      }
+    },
+    "Maybe Later" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "後で"
+          }
+        }
+      }
+    },
+    "Missing closing parenthesis ')'" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ") が足りません"
+          }
+        }
+      }
+    },
+    "Missing closing parenthesis ')' in exponent" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ") が足りません (指数)"
+          }
+        }
+      }
+    },
+    "No Thanks" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今は不要"
+          }
+        }
+      }
+    },
+    "Only variable 's' and function sqrt() are supported (got: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使える変数は s、関数は sqrt() のみです (今: %@)"
+          }
+        }
+      }
+    },
+    "Only variable 's' is supported (got: %@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使える変数は s のみです (今: %@)"
+          }
+        }
+      }
+    },
+    "Phase" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位相線図"
+          }
+        }
+      }
+    },
+    "Phase(deg)" : {
+
+    },
+    "Please enter a valid expression" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効な式を入力してください"
+          }
+        }
+      }
+    },
+    "Points" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点数"
+          }
+        }
+      }
+    },
+    "Reset to Defaults" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初期値に戻す"
+          }
+        }
+      }
+    },
+    "Result is NaN or infinity" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計算結果が NaN/∞ になっています"
+          }
+        }
+      }
+    },
+    "Series" : {
+
+    },
+    "sqrt must be followed by ()" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "sqrt の後ろは ( ) が必要です"
+          }
+        }
+      }
+    },
+    "Start 10^" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始 10^"
+          }
+        }
+      }
+    },
+    "Transfer Functions" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伝達関数"
+          }
+        }
+      }
+    },
+    "Unexpected tokens after expression" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "式の後ろに余計なものがあります"
+          }
+        }
+      }
+    },
+    "Unparseable token: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "式として読めないトークン: %@"
+          }
+        }
+      }
+    },
+    "Write a Review" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レビューを書く"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Charts
+import StoreKit
 
 // =====================================================
 //  Complex（Bode計算用）
@@ -36,18 +37,15 @@ struct Complex: Equatable {
 
 extension Complex {
     func exp() -> Complex {
-        // exp(a+jb)=exp(a)(cos b + j sin b)
         let ea = Foundation.exp(re)
         return Complex(re: ea * cos(im), im: ea * sin(im))
     }
 
     func log() -> Complex {
-        // principal value log(z)=ln|z| + j arg(z)
         return Complex(re: Foundation.log(self.abs()), im: atan2(im, re))
     }
 
     func pow(_ p: Double) -> Complex {
-        // z^p = exp(p * log(z))  (principal branch)
         let l = self.log()
         return Complex(re: l.re * p, im: l.im * p).exp()
     }
@@ -57,7 +55,7 @@ extension Complex {
 //  Bodeモデル
 // =====================================================
 struct BodePoint: Identifiable {
-    var id: Double { w }   // ← w をIDに（並び順・描画安定化）
+    var id: Double { w }
     let w: Double
     let logW: Double
     let magDB: Double
@@ -76,7 +74,6 @@ enum BodeCalc {
         }
     }
 
-    /// Horner: coeffs are highest order first
     static func evalPoly(_ coeffsHighFirst: [Double], at s: Complex) -> Complex {
         var y = Complex.zero
         for c in coeffsHighFirst {
@@ -113,7 +110,7 @@ enum BodeCalc {
         phases.reserveCapacity(ws.count)
 
         for w in ws {
-            let s = Complex(re: 0, im: w) // jω
+            let s = Complex(re: 0, im: w)
             let n = evalPoly(numHighFirst, at: s)
             let d = evalPoly(denHighFirst, at: s)
             let h = n / d
@@ -141,7 +138,7 @@ enum BodeCalc {
         phases.reserveCapacity(ws.count)
 
         for w in ws {
-            let s = Complex(re: 0, im: w) // jω
+            let s = Complex(re: 0, im: w)
             let h = eval(s)
 
             mags.append(20.0 * log10(h.abs()))
@@ -158,10 +155,17 @@ enum BodeCalc {
 }
 
 // =====================================================
-//  ここから「式 → (分子/分母)多項式係数」パーサ
+//  ローカライズ用ヘルパー
+// =====================================================
+fileprivate func locError(_ key: String.LocalizationValue) -> ParseError {
+    .message(String(localized: key))
+}
+
+// =====================================================
+//  式 → (分子/分母) 多項式係数 パーサ
 // =====================================================
 
-typealias Poly = [Double] // 低次→高次（a0 + a1*s + ...）
+typealias Poly = [Double]
 
 fileprivate let polyEps = 1e-12
 
@@ -233,7 +237,7 @@ struct Rational {
     init(num: Poly, den: Poly) throws {
         let dn = trimPoly(den)
         if dn.count == 1, abs(dn[0]) < polyEps {
-            throw ParseError.message("分母が 0 になってる")
+            throw locError("Denominator is zero")
         }
         self.num = trimPoly(num)
         self.den = dn
@@ -241,13 +245,11 @@ struct Rational {
     }
 
     mutating func normalize() {
-        // 分母の最高次係数で軽く正規化（値が大きくなりすぎるの防止）
         let lead = den.last ?? 1
         if abs(lead) > polyEps {
             num = polyScale(num, 1.0 / lead)
             den = polyScale(den, 1.0 / lead)
         }
-        // 分母の符号を揃える（最高次係数を正に）
         if (den.last ?? 1) < 0 {
             num = polyScale(num, -1)
             den = polyScale(den, -1)
@@ -255,7 +257,6 @@ struct Rational {
     }
 
     static func + (lhs: Rational, rhs: Rational) throws -> Rational {
-        // a/b + c/d = (ad + cb) / bd
         let ad = polyMul(lhs.num, rhs.den)
         let cb = polyMul(rhs.num, lhs.den)
         let n = polyAdd(ad, cb)
@@ -274,22 +275,21 @@ struct Rational {
                             den: polyMul(lhs.den, rhs.den))
     }
     static func / (lhs: Rational, rhs: Rational) throws -> Rational {
-        // a/b ÷ c/d = ad/bc
         return try Rational(num: polyMul(lhs.num, rhs.den),
                             den: polyMul(lhs.den, rhs.num))
     }
 
     func pow(_ e: Int) throws -> Rational {
-        if e < 0 { throw ParseError.message("^は0以上の整数だけ対応") }
+        if e < 0 {
+            throw locError("^ only supports non-negative integer exponents")
+        }
         return try Rational(num: polyPow(num, e), den: polyPow(den, e))
     }
 
     func toHighFirstCoeffs() -> (num: [Double], den: [Double]) {
-        // low-first -> high-first
         func toHigh(_ p: Poly) -> [Double] {
             let p = trimPoly(p)
             var h = Array(p.reversed())
-            // 先頭の超微小を削る（高次側）
             while h.count > 1, abs(h.first ?? 0) < polyEps { h.removeFirst() }
             return h.isEmpty ? [0] : h
         }
@@ -306,8 +306,8 @@ enum ParseError: Error, LocalizedError {
 
 enum Token: Equatable {
     case number(Double)
-    case ident(String)     // "s"
-    case op(Character)     // + - * / ^
+    case ident(String)
+    case op(Character)
     case lparen
     case rparen
     case end
@@ -318,14 +318,7 @@ struct Lexer {
     var i: String.Index
 
     init(_ raw: String) {
-        // 入力ゆらぎに強くする（全角/記号ゆらぎ/波括弧など）
-        // 例:
-        //  - 10×9+s  -> 10*9+s
-        //  - 1/{s(s+1)} -> 1/(s(s+1))
-        //  - 全角括弧（ ）や｛ ｝もOK
         let normalized = Lexer.normalize(raw)
-
-        // "G(s)=..." が来る前提：最初の '=' の右側だけ使う
         if let eq = normalized.firstIndex(of: "=") {
             self.input = String(normalized[normalized.index(after: eq)...])
         } else {
@@ -339,37 +332,27 @@ struct Lexer {
         out.reserveCapacity(raw.count)
 
         for ch in raw {
-            // すべての空白（全角スペース含む）を除去
             if ch.isWhitespace { continue }
 
             switch ch {
-            // 掛け算
             case "×", "∙", "·", "•", "・", "＊":
                 out.append("*")
-            // 割り算
             case "÷", "／":
                 out.append("/")
-            // マイナス（Unicodeのダッシュ類）
             case "−", "–", "—":
                 out.append("-")
-            // プラス（全角）
             case "＋":
                 out.append("+")
-            // 冪（全角）
             case "＾":
                 out.append("^")
-
-            // 括弧：丸括弧以外も許容
             case "（", "【", "［", "〔", "｛", "{", "[":
                 out.append("(")
             case "）", "】", "］", "〕", "｝", "}", "]":
                 out.append(")")
-
             default:
                 out.append(ch)
             }
         }
-
         return out
     }
 
@@ -401,7 +384,7 @@ struct Lexer {
             if let v = Double(s) {
                 return .number(v)
             } else {
-                throw ParseError.message("数値が読めない: \(s)")
+                throw locError("Cannot read number: \(s)")
             }
         }
 
@@ -413,7 +396,7 @@ struct Lexer {
             return .ident(name)
         }
 
-        throw ParseError.message("不正な文字: \(ch)")
+        throw locError("Invalid character: \(String(ch))")
     }
 }
 
@@ -443,22 +426,19 @@ final class Parser {
 
     private func isImplicitMulStart(_ t: Token) -> Bool {
         switch t {
-        case .number, .ident, .lparen:
-            return true
-        default:
-            return false
+        case .number, .ident, .lparen: return true
+        default: return false
         }
     }
 
     func parse() throws -> Rational {
         let r = try parseExpression()
         if peek() != .end {
-            throw ParseError.message("式の後ろに余計なものがある")
+            throw locError("Unexpected tokens after expression")
         }
         return r
     }
 
-    // expression := term { (+|-) term }
     private func parseExpression() throws -> Rational {
         var lhs = try parseTerm()
         while true {
@@ -468,17 +448,13 @@ final class Parser {
             } else if matchOp("-") {
                 let rhs = try parseTerm()
                 lhs = try (lhs - rhs)
-            } else {
-                break
-            }
+            } else { break }
         }
         return lhs
     }
 
-    // term := power { (*|/|implicitMul) power }
     private func parseTerm() throws -> Rational {
         var lhs = try parsePower()
-
         while true {
             if matchOp("*") {
                 let rhs = try parsePower()
@@ -487,35 +463,30 @@ final class Parser {
                 let rhs = try parsePower()
                 lhs = try (lhs / rhs)
             } else if isImplicitMulStart(peek()) {
-                // 暗黙の掛け算: 2(s+1), (s+1)(s+2), s(s+1) など
                 let rhs = try parsePower()
                 lhs = try (lhs * rhs)
-            } else {
-                break
-            }
+            } else { break }
         }
         return lhs
     }
 
-    // power := unary { ^ INT }   （^ は 0以上整数のみ）
     private func parsePower() throws -> Rational {
         var base = try parseUnary()
         while matchOp("^") {
             let expTok = peek()
             guard case .number(let v) = expTok else {
-                throw ParseError.message("^ の後ろは整数（例: ^2）だけ対応")
+                throw locError("^ must be followed by an integer (e.g. ^2)")
             }
             advance()
             let e = Int(v)
             if abs(Double(e) - v) > 1e-9 || e < 0 {
-                throw ParseError.message("^ は 0以上の整数だけ対応（今: \(v)）")
+                throw locError("^ only supports non-negative integers (got: \(String(v)))")
             }
             base = try base.pow(e)
         }
         return base
     }
 
-    // unary := (+ unary) | (- unary) | primary
     private func parseUnary() throws -> Rational {
         if matchOp("+") { return try parseUnary() }
         if matchOp("-") {
@@ -525,7 +496,6 @@ final class Parser {
         return try parsePrimary()
     }
 
-    // primary := number | s | ( expression )
     private func parsePrimary() throws -> Rational {
         switch peek() {
         case .number(let v):
@@ -534,26 +504,27 @@ final class Parser {
         case .ident(let name):
             advance()
             if name.lowercased() != "s" {
-                throw ParseError.message("使える変数は s だけ（今: \(name)）")
+                throw locError("Only variable 's' is supported (got: \(name))")
             }
-            return try Rational(num: [0, 1], den: [1]) // s
+            return try Rational(num: [0, 1], den: [1])
         case .lparen:
             advance()
             let r = try parseExpression()
-            if peek() != .rparen { throw ParseError.message(") が足りない") }
+            if peek() != .rparen {
+                throw locError("Missing closing parenthesis ')'")
+            }
             advance()
             return r
         case .end:
-            throw ParseError.message("有効な式を入力して下さい。")
+            throw locError("Please enter a valid expression")
         default:
-            throw ParseError.message("式として読めないトークン: \(peek())")
+            throw locError("Unparseable token: \(String(describing: peek()))")
         }
     }
 }
 
 // =====================================================
-//  Complex式をそのまま評価する（非整数冪OK）パーサ
-//  対応: + - * / ^(実数), 暗黙積, ( ), s, sqrt(x)
+//  Complex式パーサ（非整数冪OK）
 // =====================================================
 
 indirect enum CExpr {
@@ -610,20 +581,19 @@ final class ComplexExprParser {
 
     private func isImplicitMulStart(_ t: Token) -> Bool {
         switch t {
-        case .number, .ident, .lparen:
-            return true
-        default:
-            return false
+        case .number, .ident, .lparen: return true
+        default: return false
         }
     }
 
     func parse() throws -> CExpr {
         let e = try parseExpression()
-        if peek() != .end { throw ParseError.message("式の後ろに余計なものがある") }
+        if peek() != .end {
+            throw locError("Unexpected tokens after expression")
+        }
         return e
     }
 
-    // expression := term { (+|-) term }
     private func parseExpression() throws -> CExpr {
         var lhs = try parseTerm()
         while true {
@@ -638,7 +608,6 @@ final class ComplexExprParser {
         return lhs
     }
 
-    // term := power { (*|/|implicitMul) power }
     private func parseTerm() throws -> CExpr {
         var lhs = try parsePower()
         while true {
@@ -656,8 +625,6 @@ final class ComplexExprParser {
         return lhs
     }
 
-    // power := unary { ^ realConst }
-    // realConst は 例: 2, -1, 0.5, ( -1/2 ) みたいな「実数定数式」
     private func parsePower() throws -> CExpr {
         var base = try parseUnary()
         while matchOp("^") {
@@ -682,41 +649,44 @@ final class ComplexExprParser {
         case .ident(let name):
             advance()
             let lower = name.lowercased()
-
             if lower == "s" { return .s }
-
-            // sqrt(x) だけサポート（必要なら exp/log も増やせる）
             if lower == "sqrt" {
-                guard peek() == .lparen else { throw ParseError.message("sqrt の後ろは ( ) が必要") }
+                guard peek() == .lparen else {
+                    throw locError("sqrt must be followed by ()")
+                }
                 advance()
                 let arg = try parseExpression()
-                if peek() != .rparen { throw ParseError.message(") が足りない") }
+                if peek() != .rparen {
+                    throw locError("Missing closing parenthesis ')'")
+                }
                 advance()
                 return .sqrt(arg)
             }
-
-            throw ParseError.message("使える変数は s、関数は sqrt() のみ（今: \(name)）")
+            throw locError("Only variable 's' and function sqrt() are supported (got: \(name))")
 
         case .lparen:
             advance()
             let e = try parseExpression()
-            if peek() != .rparen { throw ParseError.message(") が足りない") }
+            if peek() != .rparen {
+                throw locError("Missing closing parenthesis ')'")
+            }
             advance()
             return e
 
         case .end:
-            throw ParseError.message("有効な式を入力して下さい。")
+            throw locError("Please enter a valid expression")
         default:
-            throw ParseError.message("式として読めないトークン: \(peek())")
+            throw locError("Unparseable token: \(String(describing: peek()))")
         }
     }
 
-    // ---- ここから「実数定数式」だけ読む（sは禁止） ----
     private func parseRealConst() throws -> Double {
         if peek() == .lparen {
             advance()
             let v = try parseRealExpr()
-            if peek() != .rparen { throw ParseError.message(") が足りない（指数）") }
+            if peek() != .rparen {
+                throw locError("Missing closing parenthesis ')' in exponent")
+            }
             advance()
             return v
         }
@@ -756,262 +726,621 @@ final class ComplexExprParser {
         case .lparen:
             advance()
             let v = try parseRealExpr()
-            if peek() != .rparen { throw ParseError.message(") が足りない（指数）") }
+            if peek() != .rparen {
+                throw locError("Missing closing parenthesis ')' in exponent")
+            }
             advance()
             return v
         case .ident:
-            throw ParseError.message("指数に s は使えない（指数は実数定数だけ）")
+            throw locError("Cannot use 's' in exponent (must be a real constant)")
         default:
-            throw ParseError.message("指数が読めない")
+            throw locError("Cannot read exponent")
         }
     }
 }
 
 // =====================================================
-//  UI（式入力 → 係数化 → Bode）
+//  レビュー促進
+// =====================================================
+struct ReviewPromptModifier: ViewModifier {
+    @AppStorage("bode_firstLaunchTS")     private var firstLaunchTS: Double = 0
+    @AppStorage("bode_reviewPromptDone")  private var promptDone: Bool = false
+
+    @State private var showAlert = false
+    @Environment(\.requestReview) private var requestReview
+
+    private let oneWeek: TimeInterval = 7 * 24 * 60 * 60
+
+    func body(content: Content) -> some View {
+        content
+            .task { await checkPrompt() }
+            .alert("Enjoying Bode Plot?", isPresented: $showAlert) {
+                Button("Write a Review") {
+                    promptDone = true
+                    requestReview()
+                }
+                Button("Maybe Later") {
+                    firstLaunchTS = Date().timeIntervalSince1970
+                }
+                Button("No Thanks", role: .cancel) {
+                    promptDone = true
+                }
+            } message: {
+                Text("If you find this app useful, please consider leaving a review on the App Store. It really helps!")
+            }
+    }
+
+    private func checkPrompt() async {
+        if firstLaunchTS == 0 {
+            firstLaunchTS = Date().timeIntervalSince1970
+            return
+        }
+        if promptDone { return }
+        let elapsed = Date().timeIntervalSince1970 - firstLaunchTS
+        guard elapsed >= oneWeek else { return }
+        try? await Task.sleep(nanoseconds: 1_500_000_000)
+        await MainActor.run { showAlert = true }
+    }
+}
+
+extension View {
+    func reviewPrompt() -> some View { modifier(ReviewPromptModifier()) }
+}
+
+// =====================================================
+//  モデル
+// =====================================================
+struct ExprEntry: Codable, Identifiable, Equatable {
+    let id: UUID
+    var text: String
+    var colorIndex: Int
+
+    init(id: UUID = UUID(), text: String = "", colorIndex: Int = 0) {
+        self.id = id
+        self.text = text
+        self.colorIndex = colorIndex
+    }
+}
+
+struct BodeSeries: Identifiable {
+    let id: UUID
+    let color: Color
+    let label: String
+    let bodeData: [BodePoint]
+    let errorMessage: String?
+}
+
+private let seriesColors: [Color] = [
+    Color(red: 0.00, green: 0.48, blue: 1.00),
+    Color(red: 1.00, green: 0.58, blue: 0.00),
+    Color(red: 0.20, green: 0.78, blue: 0.35),
+    Color(red: 1.00, green: 0.23, blue: 0.19),
+    Color(red: 0.69, green: 0.32, blue: 0.87),
+    Color(red: 0.00, green: 0.78, blue: 0.85),
+    Color(red: 1.00, green: 0.18, blue: 0.59),
+    Color(red: 0.35, green: 0.34, blue: 0.84),
+]
+
+private func subscriptDigits(_ n: Int) -> String {
+    let map: [Character: Character] = [
+        "0":"₀","1":"₁","2":"₂","3":"₃","4":"₄",
+        "5":"₅","6":"₆","7":"₇","8":"₈","9":"₉"
+    ]
+    return String(String(n).map { map[$0] ?? $0 })
+}
+
+// 数式プレースホルダや軸ラベルは数学記号のため翻訳不要
+private let exprPlaceholder = "G(s) = 100 / (s(s+1)^2)"
+private let gainAxisLabel   = "20 log |G(jω)|  [dB]"
+private let phaseAxisLabel  = "∠G(jω)  [deg]"
+
+// =====================================================
+//  小さなビュー部品
+// =====================================================
+struct SeriesBadge: View {
+    let index: Int
+    let color: Color
+    var size: CGFloat = 28
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color)
+            Text(verbatim: "\(index)")
+                .font(.system(size: size * 0.45, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+        }
+        .frame(width: size, height: size)
+        .shadow(color: color.opacity(0.3), radius: 2, y: 1)
+    }
+}
+
+struct ChartLegendView: View {
+    struct Item: Identifiable {
+        let id: UUID
+        let label: String
+        let color: Color
+    }
+    let items: [Item]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 14) {
+                ForEach(items) { item in
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(item.color)
+                            .frame(width: 18, height: 3)
+                        Text(verbatim: item.label)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                    }
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+}
+
+struct EmptyChartHintView: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "waveform.path")
+                .font(.system(size: 38, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text("Enter a transfer function above to plot its Bode diagram here")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+    }
+}
+
+// =====================================================
+//  1行分の式入力ビュー
+// =====================================================
+struct ExprRowView: View {
+    let index: Int
+    @Binding var text: String
+    let color: Color
+    let error: String?
+    let canDelete: Bool
+    let onDelete: () -> Void
+    @FocusState.Binding var focusedID: UUID?
+    let entryID: UUID
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 12) {
+                SeriesBadge(index: index, color: color)
+                    .padding(.top, 4)
+
+                TextField(exprPlaceholder, text: $text, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.body.monospaced())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(.tertiarySystemBackground))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(
+                                focusedID == entryID ? color.opacity(0.6)
+                                                     : Color.secondary.opacity(0.15),
+                                lineWidth: focusedID == entryID ? 1.5 : 1
+                            )
+                    )
+                    .lineLimit(1...4)
+                    .focused($focusedID, equals: entryID)
+                    .submitLabel(.done)
+                    .autocorrectionDisabled(true)
+                    .textInputAutocapitalization(.never)
+
+                if canDelete {
+                    Button(role: .destructive, action: onDelete) {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.red.opacity(0.85))
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 6)
+                    .accessibilityLabel("Delete")
+                }
+            }
+
+            if let error {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .symbolRenderingMode(.hierarchical)
+                    Text(verbatim: error)
+                        .font(.caption)
+                }
+                .foregroundStyle(.red)
+                .padding(.leading, 40)
+            }
+        }
+    }
+}
+
+// =====================================================
+//  メインビュー
 // =====================================================
 struct ContentView: View {
 
-    // ✅ 式入力（アプリ再起動しても保持）
-    @AppStorage("bode_exprText") private var exprText: String = ""
-    //@AppStorage("bode_exprText") private var exprText: String = "G(s)=100/(s*(s+1)^2)"
-    @FocusState private var isExprFocused: Bool
-
-    // 周波数レンジ（アプリ再起動しても保持）
-    @AppStorage("bode_wStartExp") private var wStartExp: Double = -2
-    @AppStorage("bode_wEndExp") private var wEndExp: Double = 2
-    @AppStorage("bode_points") private var points: Double = 1000
-
-    // 詳細設定（周波数範囲）を開閉（アプリ再起動しても保持）
+    @AppStorage("bode_exprsJSON")      private var exprsJSON: String = ""
+    @AppStorage("bode_wStartExp")      private var wStartExp: Double = -2
+    @AppStorage("bode_wEndExp")        private var wEndExp: Double = 2
+    @AppStorage("bode_points")         private var points: Double = 1000
     @AppStorage("bode_isAdvancedOpen") private var isAdvancedOpen: Bool = false
 
-    @State private var bodeData: [BodePoint] = []
-    @State private var errorMessage: String?
-
-    // 入力変更のたびに再計算（スライダー連打で重くならないよう軽いデバウンス）
+    @State private var entries: [ExprEntry] = [ExprEntry()]
+    @State private var allSeries: [BodeSeries] = []
     @State private var recalcTask: Task<Void, Never>?
+    @FocusState private var focusedID: UUID?
 
-    // デバッグ表示（係数）
-    @State private var lastNum: [Double] = []
-    @State private var lastDen: [Double] = []
+    private var activeSeries: [BodeSeries] {
+        allSeries.filter { !$0.bodeData.isEmpty }
+    }
+
+    private var canAddMore: Bool { entries.count < seriesColors.count }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 20) {
 
-                    GroupBox("伝達関数") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            TextField("G(s)=100/(s*(s+1)^2)", text: $exprText, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(3...6)
-                                .focused($isExprFocused)
-//                                .overlay(alignment: .trailing) {
-//                                    if !exprText.isEmpty {
-//                                        Button {
-//                                            exprText = ""
-//                                            // クリア後にキーボードを閉じたいなら↓を有効化
-//                                            // isExprFocused = false
-//                                        } label: {
-//                                            Image(systemName: "xmark.circle.fill")
-//                                                .foregroundStyle(.secondary)
-//                                                .padding(.trailing, 10)
-//                                        }
-//                                        .buttonStyle(.plain)
-//                                        .accessibilityLabel("入力をクリア")
-//                                    }
-//                                }
+                    expressionSection
+                    chartSection
+                    advancedSection
 
-                            if let errorMessage {
-                                Text(errorMessage)
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                            }
-
-                            // 係数を見たいなら（不要なら丸ごと消してOK）
-                            if !lastNum.isEmpty, !lastDen.isEmpty {
-                                HStack(spacing: 12) {
-                                    Text("分子: \(lastNum.map { String(format: "%.4g", $0) }.joined(separator: ", "))")
-                                    Text("分母: \(lastDen.map { String(format: "%.4g", $0) }.joined(separator: ", "))")
-                                }
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                            }
-                            
-//                            Text("points: \(bodeData.count)")
-//                                .font(.caption2)
-//                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    
-                    // リセットボタン
-                    Button(role: .destructive) {
-                        exprText = ""          // ← 数式をクリア
-                        isExprFocused = false  // ← キーボードも閉じる（不要なら消してOK）
-                    } label: {
-                        Label("リセット", systemImage: "arrow.counterclockwise")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(exprText.isEmpty)
-                    
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isAdvancedOpen.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: isAdvancedOpen ? "chevron.down" : "chevron.right")
-                                .font(.caption.weight(.semibold))
-                            Text("詳細設定")
-                                .font(.body.weight(.semibold))
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 4)
-
-                    if isAdvancedOpen {
-                        GroupBox("周波数範囲（rad/s）") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack {
-                                    Text("開始 10^")
-                                    Slider(value: $wStartExp, in: -6...3, step: 0.5)
-                                    Text(String(format: "%.1f", wStartExp))
-                                        .monospacedDigit()
-                                        .frame(width: 50, alignment: .trailing)
-                                }
-                                HStack {
-                                    Text("終了 10^")
-                                    Slider(value: $wEndExp, in: -4...6, step: 0.5)
-                                    Text(String(format: "%.1f", wEndExp))
-                                        .monospacedDigit()
-                                        .frame(width: 50, alignment: .trailing)
-                                }
-                                HStack {
-                                    Text("点数")
-                                    Slider(value: $points, in: 200...3000, step: 100)
-                                    Text("\(Int(points))")
-                                        .monospacedDigit()
-                                        .frame(width: 60, alignment: .trailing)
-                                }
-                            }
-                        }
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        
-                        Button {
-                            resetAdvancedSettings()
-                        } label: {
-                            Label("設定をリセット", systemImage: "arrow.counterclockwise")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-
-                    BodeChartsView(
-                        data: bodeData,
-                        wStartExp: min(wStartExp, wEndExp - 0.5),
-                        wEndExp: max(wEndExp, wStartExp + 0.5)
-                    )
-                    
-                    Text("※これらの図は片対数グラフであり、横軸は角周波数wを対数目盛(logw)で取っています。")
+                    Text("Horizontal axis is angular frequency ω on a logarithmic scale (log₁₀ω).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .padding(.top, 6)
+                        .padding(.top, 4)
                 }
                 .padding()
             }
-            .navigationTitle("ボード線図")
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("Bode Plot")
+            .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(
-                TapGesture().onEnded {
-                    isExprFocused = false
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button {
+                        focusedID = nil
+                    } label: {
+                        Text("Done").bold()
+                    }
                 }
+            }
+        }
+        .onAppear {
+            loadEntries()
+            scheduleRecalc()
+        }
+        .onChange(of: entries) { _, _ in
+            saveEntries()
+            scheduleRecalc()
+        }
+        .onChange(of: wStartExp) { _, _ in scheduleRecalc() }
+        .onChange(of: wEndExp)   { _, _ in scheduleRecalc() }
+        .onChange(of: points)    { _, _ in scheduleRecalc() }
+        .reviewPrompt()
+    }
+
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var expressionSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionHeader(titleKey: "Transfer Functions", systemImage: "function")
+
+            VStack(spacing: 0) {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { idx, entry in
+                    ExprRowView(
+                        index: idx + 1,
+                        text: $entries[idx].text,
+                        color: seriesColors[entry.colorIndex % seriesColors.count],
+                        error: allSeries.first(where: { $0.id == entry.id })?.errorMessage,
+                        canDelete: entries.count > 1,
+                        onDelete: { deleteEntry(at: idx) },
+                        focusedID: $focusedID,
+                        entryID: entry.id
+                    )
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .top)),
+                        removal: .opacity.combined(with: .scale(scale: 0.95))
+                    ))
+
+                    if idx < entries.count - 1 {
+                        Divider().padding(.leading, 14)
+                    }
+                }
+
+                Divider()
+
+                HStack(spacing: 12) {
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            addEntry()
+                        }
+                    } label: {
+                        Label("Add Expression", systemImage: "plus.circle.fill")
+                            .font(.callout.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(!canAddMore)
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            entries = [ExprEntry(colorIndex: 0)]
+                            focusedID = nil
+                        }
+                    } label: {
+                        Label("Clear All", systemImage: "trash")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(entries.count == 1 && (entries.first?.text.isEmpty ?? true))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color(.secondarySystemGroupedBackground))
             )
         }
-        .onAppear { scheduleRecalc() }
-        .onChange(of: exprText) { _, _ in scheduleRecalc() }
-        .onChange(of: wStartExp) { _, _ in scheduleRecalc() }
-        .onChange(of: wEndExp) { _, _ in scheduleRecalc() }
-        .onChange(of: points) { _, _ in scheduleRecalc() }
     }
+
+    @ViewBuilder
+    private var chartSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if activeSeries.isEmpty {
+                EmptyChartHintView()
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color(.secondarySystemGroupedBackground))
+                    )
+            } else {
+                if activeSeries.count > 1 {
+                    ChartLegendView(items: activeSeries.enumerated().map { idx, s in
+                        ChartLegendView.Item(
+                            id: s.id,
+                            label: "G" + subscriptDigits(idx + 1),
+                            color: s.color
+                        )
+                    })
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color(.secondarySystemGroupedBackground))
+                    )
+                }
+
+                BodeChartsView(
+                    series: activeSeries,
+                    wStartExp: min(wStartExp, wEndExp - 0.5),
+                    wEndExp: max(wEndExp, wStartExp + 0.5)
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var advancedSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isAdvancedOpen.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Advanced Settings")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isAdvancedOpen ? 90 : 0))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isAdvancedOpen {
+                Divider()
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Frequency Range (rad/s)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+
+                    sliderRow(labelKey: "Start 10^",
+                              value: $wStartExp,
+                              range: -6...3, step: 0.5,
+                              format: "%.1f", width: 50)
+
+                    sliderRow(labelKey: "End 10^",
+                              value: $wEndExp,
+                              range: -4...6, step: 0.5,
+                              format: "%.1f", width: 50)
+
+                    sliderRow(labelKey: "Points",
+                              value: $points,
+                              range: 200...3000, step: 100,
+                              format: "%.0f", width: 60)
+
+                    Button {
+                        withAnimation { resetAdvancedSettings() }
+                    } label: {
+                        Label("Reset to Defaults", systemImage: "arrow.counterclockwise")
+                            .font(.callout.weight(.medium))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
+                    .padding(.top, 6)
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+    }
+
+    @ViewBuilder
+    private func sliderRow(labelKey: LocalizedStringKey,
+                           value: Binding<Double>,
+                           range: ClosedRange<Double>,
+                           step: Double,
+                           format: String,
+                           width: CGFloat) -> some View {
+        HStack(spacing: 12) {
+            Text(labelKey)
+                .font(.subheadline)
+                .frame(width: 78, alignment: .leading)
+            Slider(value: value, in: range, step: step)
+            Text(verbatim: String(format: format, value.wrappedValue))
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: width, alignment: .trailing)
+        }
+    }
+
+    // MARK: - Entry management
+
+    private func addEntry() {
+        let used = Set(entries.map { $0.colorIndex })
+        let next = (0..<seriesColors.count).first { !used.contains($0) }
+            ?? (entries.count % seriesColors.count)
+        entries.append(ExprEntry(colorIndex: next))
+    }
+
+    private func deleteEntry(at idx: Int) {
+        guard entries.indices.contains(idx) else { return }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            entries.remove(at: idx)
+            if entries.isEmpty { entries = [ExprEntry(colorIndex: 0)] }
+        }
+    }
+
+    // MARK: - Persistence
+
+    private func loadEntries() {
+        if !exprsJSON.isEmpty,
+           let data = exprsJSON.data(using: .utf8),
+           let arr = try? JSONDecoder().decode([ExprEntry].self, from: data),
+           !arr.isEmpty {
+            entries = arr
+            return
+        }
+        if let old = UserDefaults.standard.string(forKey: "bode_exprText"), !old.isEmpty {
+            entries = [ExprEntry(text: old, colorIndex: 0)]
+            saveEntries()
+            return
+        }
+        entries = [ExprEntry(colorIndex: 0)]
+    }
+
+    private func saveEntries() {
+        guard let data = try? JSONEncoder().encode(entries),
+              let str = String(data: data, encoding: .utf8) else { return }
+        exprsJSON = str
+    }
+
+    // MARK: - Recalc
 
     private func scheduleRecalc() {
         recalcTask?.cancel()
         recalcTask = Task {
-            // 体感はほぼ即時、でもドラッグ中の連続計算を抑える
             try? await Task.sleep(nanoseconds: 150_000_000)
             if Task.isCancelled { return }
-            await MainActor.run {
-                recalc()
-            }
+            await MainActor.run { recalc() }
         }
     }
 
     private func recalc() {
-        errorMessage = nil
-        lastNum = []
-        lastDen = []
-
-        // start < end を保証
         let start = min(wStartExp, wEndExp - 0.5)
-        let end = max(wEndExp, wStartExp + 0.5)
+        let end   = max(wEndExp,   wStartExp + 0.5)
 
-        do {
-            // ---- まずは従来の「係数化」ルート（整数冪向け） ----
-            let parser = try Parser(exprText)
-            let r = try parser.parse()
-            let coeffs = r.toHighFirstCoeffs()
+        allSeries = entries.enumerated().map { idx, entry in
+            let color = seriesColors[entry.colorIndex % seriesColors.count]
+            let label = "G" + subscriptDigits(idx + 1)
+            let trimmed = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            lastNum = coeffs.num
-            lastDen = coeffs.den
-
-            let raw = BodeCalc.bode(
-                numHighFirst: coeffs.num,
-                denHighFirst: coeffs.den,
-                wStartExp: start,
-                wEndExp: end,
-                points: Int(points)
-            )
-
-            bodeData = raw.filter { $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite }
-            if bodeData.isEmpty {
-                errorMessage = "計算結果が NaN/∞ になってるっぽい（式や周波数範囲を確認してね）"
+            guard !trimmed.isEmpty else {
+                return BodeSeries(id: entry.id, color: color, label: label,
+                                  bodeData: [], errorMessage: nil)
             }
-            return
 
-        } catch {
-            // ---- ダメなら「直接評価」ルート（非整数冪OK） ----
             do {
-                let p2 = try ComplexExprParser(exprText)
-                let expr = try p2.parse()
-
-                lastNum = []
-                lastDen = []
-
-                let raw = BodeCalc.bodeEval(
-                    wStartExp: start,
-                    wEndExp: end,
-                    points: Int(points)
-                ) { s in
-                    expr.eval(s)
+                let parser = try Parser(entry.text)
+                let r = try parser.parse()
+                let coeffs = r.toHighFirstCoeffs()
+                let raw = BodeCalc.bode(
+                    numHighFirst: coeffs.num, denHighFirst: coeffs.den,
+                    wStartExp: start, wEndExp: end, points: Int(points)
+                )
+                let filtered = raw.filter {
+                    $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite
                 }
-
-                bodeData = raw.filter { $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite }
-                if bodeData.isEmpty {
-                    errorMessage = "計算結果が NaN/∞ になっています（式や周波数範囲を確認して下さい）"
+                if filtered.isEmpty {
+                    return BodeSeries(id: entry.id, color: color, label: label,
+                                      bodeData: [],
+                                      errorMessage: String(localized: "Result is NaN or infinity"))
                 }
+                return BodeSeries(id: entry.id, color: color, label: label,
+                                  bodeData: filtered, errorMessage: nil)
             } catch {
-                bodeData = []
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                do {
+                    let p2 = try ComplexExprParser(entry.text)
+                    let expr = try p2.parse()
+                    let raw = BodeCalc.bodeEval(
+                        wStartExp: start, wEndExp: end, points: Int(points)
+                    ) { s in expr.eval(s) }
+                    let filtered = raw.filter {
+                        $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite
+                    }
+                    if filtered.isEmpty {
+                        return BodeSeries(id: entry.id, color: color, label: label,
+                                          bodeData: [],
+                                          errorMessage: String(localized: "Result is NaN or infinity"))
+                    }
+                    return BodeSeries(id: entry.id, color: color, label: label,
+                                      bodeData: filtered, errorMessage: nil)
+                } catch {
+                    let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                    return BodeSeries(id: entry.id, color: color, label: label,
+                                      bodeData: [], errorMessage: msg)
+                }
             }
         }
     }
-    
+
     private func resetAdvancedSettings() {
         wStartExp = -2
         wEndExp = 2
@@ -1020,51 +1349,83 @@ struct ContentView: View {
 }
 
 // =====================================================
+//  セクションヘッダー
+// =====================================================
+struct SectionHeader: View {
+    let titleKey: LocalizedStringKey
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(titleKey)
+                .font(.subheadline.weight(.semibold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 6)
+        .padding(.bottom, 6)
+    }
+}
+
+// =====================================================
 //  Charts（ゲイン/位相）
-// xは log10(ω) にして擬似log軸
 // =====================================================
 struct BodeChartsView: View {
-    let data: [BodePoint]
+    let series: [BodeSeries]
     let wStartExp: Double
     let wEndExp: Double
-    
-    var sorted: [BodePoint] { data.sorted { $0.logW < $1.logW } }
-    
-    // --- PHASE Y-AXIS HELPERS ---
+
     private var phaseMinTick: Double {
-        let minV = sorted.map { $0.phaseDeg }.min() ?? -180
+        let minV = series.flatMap { $0.bodeData }.map { $0.phaseDeg }.min() ?? -180
         return floor(minV / 90.0) * 90.0
     }
-    
+
     private var phaseMaxTick: Double {
-        let maxV = sorted.map { $0.phaseDeg }.max() ?? 180
+        let maxV = series.flatMap { $0.bodeData }.map { $0.phaseDeg }.max() ?? 180
         return ceil(maxV / 90.0) * 90.0
     }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            
-            GroupBox("ゲイン線図　x:w, y:20log|G(jw)|[dB]") {
-                Chart(sorted) { p in
-                    LineMark(
-                        x: .value("logW", p.logW),
-                        y: .value("Mag(dB)", p.magDB)
-                    )
-                    .interpolationMethod(.catmullRom)
+        VStack(alignment: .leading, spacing: 16) {
+            chartCard(titleKey: "Magnitude", subtitle: gainAxisLabel) {
+                Chart {
+                    ForEach(series) { s in
+                        ForEach(s.bodeData.sorted { $0.logW < $1.logW }) { p in
+                            LineMark(
+                                x: .value("logW", p.logW),
+                                y: .value("Mag(dB)", p.magDB),
+                                series: .value("Series", s.id.uuidString)
+                            )
+                            .foregroundStyle(s.color)
+                            .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                            .interpolationMethod(.catmullRom)
+                        }
+                    }
                 }
                 .frame(height: 240)
                 .chartXScale(domain: wStartExp...wEndExp)
                 .chartXAxis { bodeXAxis(startExp: wStartExp, endExp: wEndExp) }
                 .chartYAxis { AxisMarks(position: .leading) }
+                .chartLegend(.hidden)
             }
-            
-            GroupBox("位相線図　x:w, y:∠G(jw)[deg]") {
-                Chart(sorted) { p in
-                    LineMark(
-                        x: .value("logW", p.logW),
-                        y: .value("Phase(deg)", p.phaseDeg)
-                    )
-                    .interpolationMethod(.catmullRom)
+
+            chartCard(titleKey: "Phase", subtitle: phaseAxisLabel) {
+                Chart {
+                    ForEach(series) { s in
+                        ForEach(s.bodeData.sorted { $0.logW < $1.logW }) { p in
+                            LineMark(
+                                x: .value("logW", p.logW),
+                                y: .value("Phase(deg)", p.phaseDeg),
+                                series: .value("Series", s.id.uuidString)
+                            )
+                            .foregroundStyle(s.color)
+                            .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                            .interpolationMethod(.catmullRom)
+                        }
+                    }
                 }
                 .frame(height: 240)
                 .chartXScale(domain: wStartExp...wEndExp)
@@ -1078,26 +1439,45 @@ struct BodeChartsView: View {
                         AxisTick()
                         AxisValueLabel {
                             if let y = value.as(Double.self) {
-                                Text(String(format: "%.0f", y))
+                                Text(verbatim: String(format: "%.0f°", y))
                             }
                         }
                     }
                 }
+                .chartLegend(.hidden)
             }
         }
     }
-    
+
+    @ViewBuilder
+    private func chartCard<Content: View>(titleKey: LocalizedStringKey,
+                                          subtitle: String,
+                                          @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(titleKey)
+                    .font(.headline)
+                Spacer()
+                Text(verbatim: subtitle)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+            }
+            content()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(.secondarySystemGroupedBackground))
+        )
+    }
+
     @AxisContentBuilder
     private func bodeXAxis(startExp: Double, endExp: Double) -> some AxisContent {
         let step = 1.0
-
-        // domainの内側に入る整数だけ（ResultBuilder対策でクロージャ化）
         let exps: [Double] = {
             let start = ceil(startExp)
             let end = floor(endExp)
-
             if start > end {
-                // 1 decade未満で整数が入らないときは中央に1個だけ
                 return [round((startExp + endExp) * 0.5)]
             } else {
                 return stride(from: start, through: end, by: step).map { $0 }
@@ -1109,12 +1489,12 @@ struct BodeChartsView: View {
             AxisTick()
             AxisValueLabel {
                 if let x = value.as(Double.self) {
-                    Text(format10PowLabel(exp: x))
+                    Text(verbatim: format10PowLabel(exp: x))
                 }
             }
         }
     }
-    
+
     private func superscriptInt(_ n: Int) -> String {
         let map: [Character: String] = [
             "0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹",
@@ -1122,11 +1502,9 @@ struct BodeChartsView: View {
         ]
         return String(String(n).map { map[$0] ?? String($0) }.joined())
     }
-    
+
     private func format10PowLabel(exp: Double) -> String {
         let e = Int(round(exp))
-        return "10" + superscriptInt(e)   // 10⁻¹ みたいになる
+        return "10" + superscriptInt(e)
     }
 }
-
-
