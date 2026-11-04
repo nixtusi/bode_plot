@@ -345,12 +345,20 @@ struct Lexer {
                 out.append("+")
             case "＾":
                 out.append("^")
+            case ",", "٫", "．":
+                out.append(".")
             case "（", "【", "［", "〔", "｛", "{", "[":
                 out.append("(")
             case "）", "】", "］", "〕", "｝", "}", "]":
                 out.append(")")
             default:
-                out.append(ch)
+                if ch.unicodeScalars.count == 1,
+                   ch.unicodeScalars.first?.properties.generalCategory == .decimalNumber,
+                   let digit = ch.wholeNumberValue {
+                    out.append(String(digit))
+                } else {
+                    out.append(ch)
+                }
             }
         }
         return out
@@ -851,7 +859,6 @@ struct SeriesBadge: View {
                 .foregroundStyle(.white)
         }
         .frame(width: size, height: size)
-        .shadow(color: color.opacity(0.3), radius: 2, y: 1)
     }
 }
 
@@ -919,6 +926,7 @@ struct ExprRowView: View {
                     .padding(.top, 4)
 
                 TextField(exprPlaceholder, text: $text, axis: .vertical)
+                    .environment(\.layoutDirection, .leftToRight)
                     .textFieldStyle(.plain)
                     .font(.body.monospaced())
                     .padding(.horizontal, 12)
@@ -974,6 +982,7 @@ struct ExprRowView: View {
 // =====================================================
 struct ContentView: View {
 
+    @Environment(\.layoutDirection) private var layoutDirection
     @AppStorage("bode_exprsJSON")      private var exprsJSON: String = ""
     @AppStorage("bode_wStartExp")      private var wStartExp: Double = -2
     @AppStorage("bode_wEndExp")        private var wEndExp: Double = 2
@@ -1069,31 +1078,16 @@ struct ContentView: View {
 
                 Divider()
 
-                HStack(spacing: 12) {
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            addEntry()
-                        }
-                    } label: {
-                        Label("Add Expression", systemImage: "plus.circle.fill")
-                            .font(.callout.weight(.semibold))
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        addExpressionButton.fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 12)
+                        clearAllButton.fixedSize(horizontal: true, vertical: false)
                     }
-                    .buttonStyle(.borderless)
-                    .disabled(!canAddMore)
-
-                    Spacer()
-
-                    Button(role: .destructive) {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            entries = [ExprEntry(colorIndex: 0)]
-                            focusedID = nil
-                        }
-                    } label: {
-                        Label("Clear All", systemImage: "trash")
-                            .font(.callout)
+                    VStack(alignment: .leading, spacing: 12) {
+                        addExpressionButton
+                        clearAllButton
                     }
-                    .buttonStyle(.borderless)
-                    .disabled(entries.count == 1 && (entries.first?.text.isEmpty ?? true))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -1103,6 +1097,33 @@ struct ContentView: View {
                     .fill(Color(.secondarySystemGroupedBackground))
             )
         }
+    }
+
+    private var addExpressionButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                addEntry()
+            }
+        } label: {
+            Label("Add Expression", systemImage: "plus.circle.fill")
+                .font(.callout.weight(.semibold))
+        }
+        .buttonStyle(.borderless)
+        .disabled(!canAddMore)
+    }
+
+    private var clearAllButton: some View {
+        Button(role: .destructive) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                entries = [ExprEntry(colorIndex: 0)]
+                focusedID = nil
+            }
+        } label: {
+            Label("Clear All", systemImage: "trash")
+                .font(.callout)
+        }
+        .buttonStyle(.borderless)
+        .disabled(entries.count == 1 && (entries.first?.text.isEmpty ?? true))
     }
 
     @ViewBuilder
@@ -1156,10 +1177,10 @@ struct ContentView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isAdvancedOpen ? 90 : 0))
+                        .rotationEffect(.degrees(isAdvancedOpen ? (layoutDirection == .rightToLeft ? -90 : 90) : 0))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
@@ -1219,15 +1240,17 @@ struct ContentView: View {
                            step: Double,
                            format: String,
                            width: CGFloat) -> some View {
-        HStack(spacing: 12) {
-            Text(labelKey)
-                .font(.subheadline)
-                .frame(width: 78, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(labelKey)
+                    .font(.subheadline)
+                Spacer(minLength: 8)
+                Text(verbatim: String(format: format, locale: .current, value.wrappedValue))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: width, alignment: .trailing)
+            }
             Slider(value: value, in: range, step: step)
-            Text(verbatim: String(format: format, value.wrappedValue))
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: width, alignment: .trailing)
         }
     }
 
