@@ -12,7 +12,7 @@ import StoreKit
 // =====================================================
 //  Complex（Bode計算用）
 // =====================================================
-struct Complex: Equatable {
+nonisolated struct Complex: Equatable {
     var re: Double
     var im: Double
     static let zero = Complex(re: 0, im: 0)
@@ -35,7 +35,7 @@ struct Complex: Equatable {
     func phaseDeg() -> Double { atan2(im, re) * 180.0 / .pi }
 }
 
-extension Complex {
+nonisolated extension Complex {
     func exp() -> Complex {
         let ea = Foundation.exp(re)
         return Complex(re: ea * cos(im), im: ea * sin(im))
@@ -54,18 +54,19 @@ extension Complex {
 // =====================================================
 //  Bodeモデル
 // =====================================================
-struct BodePoint: Identifiable {
+nonisolated struct BodePoint: Identifiable, Sendable {
     var id: Double { w }
     let w: Double
     let logW: Double
     let magDB: Double
     let phaseDeg: Double
+    let seriesLabel: String
 }
 
 // =====================================================
 //  Bode計算
 // =====================================================
-enum BodeCalc {
+nonisolated enum BodeCalc {
     static func logspace(startExp: Double, endExp: Double, count: Int) -> [Double] {
         guard count >= 2 else { return [pow(10, startExp)] }
         return (0..<count).map { i in
@@ -99,7 +100,8 @@ enum BodeCalc {
     }
 
     static func bode(numHighFirst: [Double], denHighFirst: [Double],
-                     wStartExp: Double, wEndExp: Double, points: Int) -> [BodePoint] {
+                     wStartExp: Double, wEndExp: Double, points: Int,
+                     seriesLabel: String = "") -> [BodePoint] {
 
         let ws = logspace(startExp: wStartExp, endExp: wEndExp, count: points)
 
@@ -110,6 +112,7 @@ enum BodeCalc {
         phases.reserveCapacity(ws.count)
 
         for w in ws {
+            if Task.isCancelled { return [] }
             let s = Complex(re: 0, im: w)
             let n = evalPoly(numHighFirst, at: s)
             let d = evalPoly(denHighFirst, at: s)
@@ -123,11 +126,12 @@ enum BodeCalc {
 
         return zip(zip(ws, mags), unwrapped).map { pair, ph in
             let (w, magDB) = pair
-            return BodePoint(w: w, logW: log10(w), magDB: magDB, phaseDeg: ph)
+            return BodePoint(w: w, logW: log10(w), magDB: magDB, phaseDeg: ph, seriesLabel: seriesLabel)
         }
     }
 
     static func bodeEval(wStartExp: Double, wEndExp: Double, points: Int,
+                         seriesLabel: String = "",
                          eval: (Complex) -> Complex) -> [BodePoint] {
 
         let ws = logspace(startExp: wStartExp, endExp: wEndExp, count: points)
@@ -138,6 +142,7 @@ enum BodeCalc {
         phases.reserveCapacity(ws.count)
 
         for w in ws {
+            if Task.isCancelled { return [] }
             let s = Complex(re: 0, im: w)
             let h = eval(s)
 
@@ -149,7 +154,7 @@ enum BodeCalc {
 
         return zip(zip(ws, mags), unwrapped).map { pair, ph in
             let (w, magDB) = pair
-            return BodePoint(w: w, logW: log10(w), magDB: magDB, phaseDeg: ph)
+            return BodePoint(w: w, logW: log10(w), magDB: magDB, phaseDeg: ph, seriesLabel: seriesLabel)
         }
     }
 }
@@ -157,7 +162,7 @@ enum BodeCalc {
 // =====================================================
 //  ローカライズ用ヘルパー
 // =====================================================
-fileprivate func locError(_ key: String.LocalizationValue) -> ParseError {
+nonisolated fileprivate func locError(_ key: String.LocalizationValue) -> ParseError {
     .message(String(localized: key))
 }
 
@@ -167,16 +172,16 @@ fileprivate func locError(_ key: String.LocalizationValue) -> ParseError {
 
 typealias Poly = [Double]
 
-fileprivate let polyEps = 1e-12
+nonisolated fileprivate let polyEps = 1e-12
 
-fileprivate func trimPoly(_ p: Poly) -> Poly {
+nonisolated fileprivate func trimPoly(_ p: Poly) -> Poly {
     var p = p
     while p.count > 1, abs(p.last ?? 0) < polyEps { p.removeLast() }
     if p.isEmpty { return [0] }
     return p
 }
 
-fileprivate func polyAdd(_ a: Poly, _ b: Poly) -> Poly {
+nonisolated fileprivate func polyAdd(_ a: Poly, _ b: Poly) -> Poly {
     let n = max(a.count, b.count)
     var out = Array(repeating: 0.0, count: n)
     for i in 0..<n {
@@ -187,7 +192,7 @@ fileprivate func polyAdd(_ a: Poly, _ b: Poly) -> Poly {
     return trimPoly(out)
 }
 
-fileprivate func polySub(_ a: Poly, _ b: Poly) -> Poly {
+nonisolated fileprivate func polySub(_ a: Poly, _ b: Poly) -> Poly {
     let n = max(a.count, b.count)
     var out = Array(repeating: 0.0, count: n)
     for i in 0..<n {
@@ -198,12 +203,13 @@ fileprivate func polySub(_ a: Poly, _ b: Poly) -> Poly {
     return trimPoly(out)
 }
 
-fileprivate func polyMul(_ a: Poly, _ b: Poly) -> Poly {
+nonisolated fileprivate func polyMul(_ a: Poly, _ b: Poly) -> Poly {
     let a = trimPoly(a), b = trimPoly(b)
     if a.count == 1, abs(a[0]) < polyEps { return [0] }
     if b.count == 1, abs(b[0]) < polyEps { return [0] }
     var out = Array(repeating: 0.0, count: a.count + b.count - 1)
     for i in 0..<a.count {
+        if Task.isCancelled { return [0] }
         for j in 0..<b.count {
             out[i + j] += a[i] * b[j]
         }
@@ -211,11 +217,11 @@ fileprivate func polyMul(_ a: Poly, _ b: Poly) -> Poly {
     return trimPoly(out)
 }
 
-fileprivate func polyScale(_ a: Poly, _ k: Double) -> Poly {
+nonisolated fileprivate func polyScale(_ a: Poly, _ k: Double) -> Poly {
     trimPoly(a.map { $0 * k })
 }
 
-fileprivate func polyPow(_ a: Poly, _ e: Int) -> Poly {
+nonisolated fileprivate func polyPow(_ a: Poly, _ e: Int) -> Poly {
     precondition(e >= 0)
     if e == 0 { return [1] }
     if e == 1 { return trimPoly(a) }
@@ -223,6 +229,7 @@ fileprivate func polyPow(_ a: Poly, _ e: Int) -> Poly {
     var exp = e
     var res: Poly = [1]
     while exp > 0 {
+        if Task.isCancelled { return [0] }
         if (exp & 1) == 1 { res = polyMul(res, base) }
         exp >>= 1
         if exp > 0 { base = polyMul(base, base) }
@@ -230,7 +237,11 @@ fileprivate func polyPow(_ a: Poly, _ e: Int) -> Poly {
     return trimPoly(res)
 }
 
-struct Rational {
+private nonisolated enum PolynomialExpansionFallback: Error {
+    case useComplexEvaluator
+}
+
+nonisolated struct Rational {
     var num: Poly
     var den: Poly
 
@@ -283,6 +294,12 @@ struct Rational {
         if e < 0 {
             throw locError("^ only supports non-negative integer exponents")
         }
+        // Avoid expanding enormous polynomials while a long exponent is being
+        // typed. The general complex evaluator handles the same expression.
+        let degree = max(num.count, den.count) - 1
+        if degree > 0, e > 256 / degree {
+            throw PolynomialExpansionFallback.useComplexEvaluator
+        }
         return try Rational(num: polyPow(num, e), den: polyPow(den, e))
     }
 
@@ -297,14 +314,14 @@ struct Rational {
     }
 }
 
-enum ParseError: Error, LocalizedError {
+nonisolated enum ParseError: Error, LocalizedError {
     case message(String)
     var errorDescription: String? {
         switch self { case .message(let s): return s }
     }
 }
 
-enum Token: Equatable {
+nonisolated enum Token: Equatable {
     case number(Double)
     case ident(String)
     case op(Character)
@@ -313,7 +330,7 @@ enum Token: Equatable {
     case end
 }
 
-struct Lexer {
+nonisolated struct Lexer {
     let input: String
     var i: String.Index
 
@@ -408,7 +425,7 @@ struct Lexer {
     }
 }
 
-final class Parser {
+nonisolated final class Parser {
     private var tokens: [Token] = []
     private var pos: Int = 0
 
@@ -486,6 +503,9 @@ final class Parser {
                 throw locError("^ must be followed by an integer (e.g. ^2)")
             }
             advance()
+            guard v.isFinite, v >= 0, v < Double(Int.max) else {
+                throw locError("^ only supports non-negative integers (got: \(String(v)))")
+            }
             let e = Int(v)
             if abs(Double(e) - v) > 1e-9 || e < 0 {
                 throw locError("^ only supports non-negative integers (got: \(String(v)))")
@@ -535,7 +555,7 @@ final class Parser {
 //  Complex式パーサ（非整数冪OK）
 // =====================================================
 
-indirect enum CExpr {
+nonisolated indirect enum CExpr {
     case num(Double)
     case s
     case add(CExpr, CExpr)
@@ -551,7 +571,9 @@ indirect enum CExpr {
         case .num(let v): return Complex(re: v, im: 0)
         case .s: return sVal
         case .add(let a, let b): return a.eval(sVal) + b.eval(sVal)
-        case .sub(let a, let b): return a.eval(sVal) + Complex(re: -b.eval(sVal).re, im: -b.eval(sVal).im)
+        case .sub(let a, let b):
+            let value = b.eval(sVal)
+            return a.eval(sVal) + Complex(re: -value.re, im: -value.im)
         case .mul(let a, let b): return a.eval(sVal) * b.eval(sVal)
         case .div(let a, let b): return a.eval(sVal) / b.eval(sVal)
         case .neg(let x):
@@ -565,11 +587,13 @@ indirect enum CExpr {
     }
 }
 
-final class ComplexExprParser {
+nonisolated final class ComplexExprParser {
     private var tokens: [Token] = []
     private var pos: Int = 0
+    private let rationalExponentSemantics: Bool
 
-    init(_ expr: String) throws {
+    init(_ expr: String, rationalExponentSemantics: Bool = false) throws {
+        self.rationalExponentSemantics = rationalExponentSemantics
         var lx = Lexer(expr)
         var t: Token = try lx.nextToken()
         while t != .end {
@@ -636,7 +660,21 @@ final class ComplexExprParser {
     private func parsePower() throws -> CExpr {
         var base = try parseUnary()
         while matchOp("^") {
-            let p = try parseRealConst()
+            let p: Double
+            if rationalExponentSemantics {
+                guard case .number(let value) = peek(), value.isFinite,
+                      value >= 0, value < Double(Int.max) else {
+                    throw locError("^ must be followed by an integer (e.g. ^2)")
+                }
+                let integer = Int(value)
+                guard abs(Double(integer) - value) <= 1e-9 else {
+                    throw locError("^ only supports non-negative integers (got: \(String(value)))")
+                }
+                advance()
+                p = Double(integer)
+            } else {
+                p = try parseRealConst()
+            }
             base = .pow(base, p)
         }
         return base
@@ -658,7 +696,7 @@ final class ComplexExprParser {
             advance()
             let lower = name.lowercased()
             if lower == "s" { return .s }
-            if lower == "sqrt" {
+            if lower == "sqrt", !rationalExponentSemantics {
                 guard peek() == .lparen else {
                     throw locError("sqrt must be followed by ()")
                 }
@@ -798,7 +836,7 @@ extension View {
 // =====================================================
 //  モデル
 // =====================================================
-struct ExprEntry: Codable, Identifiable, Equatable {
+nonisolated struct ExprEntry: Codable, Identifiable, Equatable, Sendable {
     let id: UUID
     var text: String
     var colorIndex: Int
@@ -817,6 +855,95 @@ struct BodeSeries: Identifiable {
     let label: String
     let bodeData: [BodePoint]
     let errorMessage: String?
+}
+
+nonisolated struct CalculatedSeries: Sendable {
+    let id: UUID
+    let colorIndex: Int
+    let label: String
+    let bodeData: [BodePoint]
+    let errorMessage: String?
+}
+
+actor BodeCalculator {
+    private struct CacheKey: Equatable {
+        let expression: String
+        let start: Double
+        let end: Double
+        let points: Int
+        let label: String
+        let colorIndex: Int
+    }
+
+    private var cache: [UUID: (key: CacheKey, result: CalculatedSeries)] = [:]
+
+    // This actor performs parsing and sampling away from the UI actor.
+    func calculate(entries: [ExprEntry], start: Double, end: Double,
+                   points: Int) -> [CalculatedSeries]? {
+        var result: [CalculatedSeries] = []
+        result.reserveCapacity(entries.count)
+
+        for (index, entry) in entries.enumerated() {
+            guard !Task.isCancelled else { return nil }
+            let label = "G" + subscriptDigits(index + 1)
+            let key = CacheKey(expression: entry.text, start: start, end: end,
+                               points: points, label: label, colorIndex: entry.colorIndex)
+            if let cached = cache[entry.id], cached.key == key {
+                result.append(cached.result)
+                continue
+            }
+            func append(_ data: [BodePoint] = [], error: String? = nil) {
+                let series = CalculatedSeries(id: entry.id, colorIndex: entry.colorIndex, label: label,
+                                              bodeData: data, errorMessage: error)
+                result.append(series)
+                cache[entry.id] = (key, series)
+            }
+
+            guard !entry.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                append()
+                continue
+            }
+
+            let raw: [BodePoint]
+            do {
+                let coefficients = try Parser(entry.text).parse().toHighFirstCoeffs()
+                guard !Task.isCancelled else { return nil }
+                raw = BodeCalc.bode(numHighFirst: coefficients.num, denHighFirst: coefficients.den,
+                                    wStartExp: start, wEndExp: end, points: points, seriesLabel: label)
+            } catch {
+                guard !Task.isCancelled else { return nil }
+                do {
+                    let expression: CExpr
+                    if error is PolynomialExpansionFallback {
+                        do {
+                            expression = try ComplexExprParser(entry.text, rationalExponentSemantics: true).parse()
+                        } catch {
+                            expression = try ComplexExprParser(entry.text).parse()
+                        }
+                    } else {
+                        expression = try ComplexExprParser(entry.text).parse()
+                    }
+                    raw = BodeCalc.bodeEval(wStartExp: start, wEndExp: end, points: points,
+                                            seriesLabel: label) { expression.eval($0) }
+                } catch {
+                    guard !Task.isCancelled else { return nil }
+                    let message = (error as? LocalizedError)?.errorDescription ?? "\(error)"
+                    append(error: message)
+                    continue
+                }
+            }
+            guard !Task.isCancelled else { return nil }
+            let filtered = raw.filter { $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite }
+            if filtered.isEmpty {
+                append(error: String(localized: "Result is NaN or infinity"))
+            } else {
+                append(filtered)
+            }
+        }
+        let currentIDs = Set(entries.map(\.id))
+        cache = cache.filter { currentIDs.contains($0.key) }
+        return result
+    }
 }
 
 private let seriesColors: [Color] = [
@@ -860,7 +987,7 @@ func seriesStroke(index: Int, distinguishWithoutColor: Bool, width: CGFloat) -> 
                        dash: distinguishWithoutColor ? seriesDashPatterns[safeIndex] : [])
 }
 
-private func subscriptDigits(_ n: Int) -> String {
+nonisolated private func subscriptDigits(_ n: Int) -> String {
     let map: [Character: Character] = [
         "0":"₀","1":"₁","2":"₂","3":"₃","4":"₄",
         "5":"₅","6":"₆","7":"₇","8":"₈","9":"₉"
@@ -1119,6 +1246,7 @@ struct ContentView: View {
     @State private var entries: [ExprEntry] = [ExprEntry()]
     @State private var allSeries: [BodeSeries] = []
     @State private var recalcTask: Task<Void, Never>?
+    @State private var calculator = BodeCalculator()
     @FocusState private var focusedID: UUID?
 
     private var activeSeries: [BodeSeries] {
@@ -1447,67 +1575,22 @@ struct ContentView: View {
 
     private func scheduleRecalc() {
         recalcTask?.cancel()
-        recalcTask = Task {
-            try? await Task.sleep(nanoseconds: 150_000_000)
-            if Task.isCancelled { return }
-            await MainActor.run { recalc() }
-        }
-    }
-
-    private func recalc() {
+        let snapshot = entries
         let start = min(wStartExp, wEndExp - 0.5)
-        let end   = max(wEndExp,   wStartExp + 0.5)
-
-        allSeries = entries.enumerated().map { idx, entry in
-            let color = seriesColor(index: entry.colorIndex, highContrast: colorSchemeContrast == .increased)
-            let label = "G" + subscriptDigits(idx + 1)
-            let trimmed = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !trimmed.isEmpty else {
-                return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
-                                  bodeData: [], errorMessage: nil)
-            }
-
+        let end = max(wEndExp, wStartExp + 0.5)
+        let pointCount = Int(points)
+        recalcTask = Task {
             do {
-                let parser = try Parser(entry.text)
-                let r = try parser.parse()
-                let coeffs = r.toHighFirstCoeffs()
-                let raw = BodeCalc.bode(
-                    numHighFirst: coeffs.num, denHighFirst: coeffs.den,
-                    wStartExp: start, wEndExp: end, points: Int(points)
-                )
-                let filtered = raw.filter {
-                    $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite
-                }
-                if filtered.isEmpty {
-                    return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
-                                      bodeData: [],
-                                      errorMessage: String(localized: "Result is NaN or infinity"))
-                }
-                return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
-                                  bodeData: filtered, errorMessage: nil)
-            } catch {
-                do {
-                    let p2 = try ComplexExprParser(entry.text)
-                    let expr = try p2.parse()
-                    let raw = BodeCalc.bodeEval(
-                        wStartExp: start, wEndExp: end, points: Int(points)
-                    ) { s in expr.eval(s) }
-                    let filtered = raw.filter {
-                        $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite
-                    }
-                    if filtered.isEmpty {
-                        return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
-                                          bodeData: [],
-                                          errorMessage: String(localized: "Result is NaN or infinity"))
-                    }
-                    return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
-                                      bodeData: filtered, errorMessage: nil)
-                } catch {
-                    let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-                    return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
-                                      bodeData: [], errorMessage: msg)
-                }
+                try await Task.sleep(nanoseconds: 150_000_000)
+            } catch { return }
+            guard let calculated = await calculator.calculate(entries: snapshot, start: start,
+                                                               end: end, points: pointCount),
+                  !Task.isCancelled else { return }
+            allSeries = calculated.map { item in
+                BodeSeries(id: item.id,
+                           color: seriesColor(index: item.colorIndex, highContrast: colorSchemeContrast == .increased),
+                           colorIndex: item.colorIndex, label: item.label,
+                           bodeData: item.bodeData, errorMessage: item.errorMessage)
             }
         }
     }
@@ -1587,16 +1670,13 @@ struct BodeChartsView: View {
                 Chart {
                     ForEach(series) { s in
                         let stroke = seriesStroke(index: s.colorIndex, distinguishWithoutColor: distinguishWithoutColor, width: 2.2)
-                        ForEach(s.bodeData.sorted { $0.logW < $1.logW }) { p in
-                            LineMark(
-                                x: .value("logW", p.logW),
-                                y: .value("Mag(dB)", p.magDB),
-                                series: .value("Series", s.label)
-                            )
-                            .foregroundStyle(s.color)
-                            .lineStyle(stroke)
-                            .interpolationMethod(.catmullRom)
-                        }
+                        LinePlot(s.bodeData,
+                                 x: .value("logW", \.logW),
+                                 y: .value("Mag(dB)", \.magDB),
+                                 series: .value("Series", \.seriesLabel))
+                        .foregroundStyle(s.color)
+                        .lineStyle(stroke)
+                        .interpolationMethod(.catmullRom)
                     }
                 }
                 .frame(height: 240)
@@ -1611,16 +1691,13 @@ struct BodeChartsView: View {
                 Chart {
                     ForEach(series) { s in
                         let stroke = seriesStroke(index: s.colorIndex, distinguishWithoutColor: distinguishWithoutColor, width: 2.2)
-                        ForEach(s.bodeData.sorted { $0.logW < $1.logW }) { p in
-                            LineMark(
-                                x: .value("logW", p.logW),
-                                y: .value("Phase(deg)", p.phaseDeg),
-                                series: .value("Series", s.label)
-                            )
-                            .foregroundStyle(s.color)
-                            .lineStyle(stroke)
-                            .interpolationMethod(.catmullRom)
-                        }
+                        LinePlot(s.bodeData,
+                                 x: .value("logW", \.logW),
+                                 y: .value("Phase(deg)", \.phaseDeg),
+                                 series: .value("Series", \.seriesLabel))
+                        .foregroundStyle(s.color)
+                        .lineStyle(stroke)
+                        .interpolationMethod(.catmullRom)
                     }
                 }
                 .frame(height: 240)
