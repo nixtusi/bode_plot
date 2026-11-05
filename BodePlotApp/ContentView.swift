@@ -813,6 +813,7 @@ struct ExprEntry: Codable, Identifiable, Equatable {
 struct BodeSeries: Identifiable {
     let id: UUID
     let color: Color
+    let colorIndex: Int
     let label: String
     let bodeData: [BodePoint]
     let errorMessage: String?
@@ -828,6 +829,36 @@ private let seriesColors: [Color] = [
     Color(red: 1.00, green: 0.18, blue: 0.59),
     Color(red: 0.35, green: 0.34, blue: 0.84),
 ]
+
+// Equal-luminance colors remain legible against light and dark chart cards
+// while keeping white badge text readable when Increase Contrast is enabled.
+private let highContrastSeriesColors: [Color] = [
+    Color(red: 0, green: 0.422, blue: 0.878),
+    Color(red: 0.641, green: 0.372, blue: 0),
+    Color(red: 0.128, green: 0.501, blue: 0.225),
+    Color(red: 0.876, green: 0.043, blue: 0),
+    Color(red: 0.647, green: 0.226, blue: 0.852),
+    Color(red: 0, green: 0.484, blue: 0.527),
+    Color(red: 0.855, green: 0, blue: 0.427),
+    Color(red: 0.386, green: 0.377, blue: 0.849),
+]
+
+func seriesColor(index: Int, highContrast: Bool) -> Color {
+    let palette = highContrast ? highContrastSeriesColors : seriesColors
+    let safeIndex = ((index % palette.count) + palette.count) % palette.count
+    return palette[safeIndex]
+}
+
+private let seriesDashPatterns: [[CGFloat]] = [
+    [], [10, 4], [2, 4], [10, 4, 2, 4],
+    [5, 3], [14, 4, 2, 4], [10, 3, 2, 3, 2, 3], [2, 3, 2, 7],
+]
+
+func seriesStroke(index: Int, distinguishWithoutColor: Bool, width: CGFloat) -> StrokeStyle {
+    let safeIndex = ((index % seriesDashPatterns.count) + seriesDashPatterns.count) % seriesDashPatterns.count
+    return StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round,
+                       dash: distinguishWithoutColor ? seriesDashPatterns[safeIndex] : [])
+}
 
 private func subscriptDigits(_ n: Int) -> String {
     let map: [Character: Character] = [
@@ -848,7 +879,7 @@ private let phaseAxisLabel  = "∠G(jω)  [deg]"
 struct SeriesBadge: View {
     let index: Int
     let color: Color
-    var size: CGFloat = 28
+    @ScaledMetric(relativeTo: .body) var size: CGFloat = 28
 
     var body: some View {
         ZStack {
@@ -863,10 +894,12 @@ struct SeriesBadge: View {
 }
 
 struct ChartLegendView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var distinguishWithoutColor
     struct Item: Identifiable {
         let id: UUID
         let label: String
         let color: Color
+        let colorIndex: Int
     }
     let items: [Item]
 
@@ -875,9 +908,21 @@ struct ChartLegendView: View {
             HStack(spacing: 14) {
                 ForEach(items) { item in
                     HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 1.5)
-                            .fill(item.color)
-                            .frame(width: 18, height: 3)
+                        if distinguishWithoutColor {
+                            Path { path in
+                                path.move(to: CGPoint(x: 1.5, y: 1.5))
+                                path.addLine(to: CGPoint(x: 48.5, y: 1.5))
+                            }
+                            .stroke(item.color, style: seriesStroke(index: item.colorIndex,
+                                                                    distinguishWithoutColor: true, width: 3))
+                            .frame(width: 50, height: 3)
+                            .accessibilityHidden(true)
+                        } else {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(item.color)
+                                .frame(width: 18, height: 3)
+                                .accessibilityHidden(true)
+                        }
                         Text(verbatim: item.label)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.primary)
@@ -895,6 +940,7 @@ struct EmptyChartHintView: View {
             Image(systemName: "waveform.path")
                 .font(.system(size: 38, weight: .light))
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text("Enter a transfer function above to plot its Bode diagram here")
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -902,7 +948,7 @@ struct EmptyChartHintView: View {
                 .padding(.horizontal, 24)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 200)
+        .frame(minHeight: 200)
     }
 }
 
@@ -910,6 +956,8 @@ struct EmptyChartHintView: View {
 //  1行分の式入力ビュー
 // =====================================================
 struct ExprRowView: View {
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let index: Int
     @Binding var text: String
     let color: Color
@@ -921,44 +969,20 @@ struct ExprRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .top, spacing: 12) {
-                SeriesBadge(index: index, color: color)
-                    .padding(.top, 4)
-
-                TextField(exprPlaceholder, text: $text, axis: .vertical)
-                    .environment(\.layoutDirection, .leftToRight)
-                    .textFieldStyle(.plain)
-                    .font(.body.monospaced())
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color(.tertiarySystemBackground))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(
-                                focusedID == entryID ? color.opacity(0.6)
-                                                     : Color.secondary.opacity(0.15),
-                                lineWidth: focusedID == entryID ? 1.5 : 1
-                            )
-                    )
-                    .lineLimit(1...4)
-                    .focused($focusedID, equals: entryID)
-                    .submitLabel(.done)
-                    .autocorrectionDisabled(true)
-                    .textInputAutocapitalization(.never)
-
-                if canDelete {
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "minus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.red.opacity(0.85))
-                            .symbolRenderingMode(.hierarchical)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        badge
+                        Spacer()
+                        if canDelete { deleteButton }
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, 6)
-                    .accessibilityLabel("Delete")
+                    expressionField
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    badge
+                    expressionField
+                    if canDelete { deleteButton }
                 }
             }
 
@@ -967,13 +991,58 @@ struct ExprRowView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.caption2)
                         .symbolRenderingMode(.hierarchical)
+                        .accessibilityHidden(true)
                     Text(verbatim: error)
                         .font(.caption)
                 }
-                .foregroundStyle(.red)
-                .padding(.leading, 40)
+                .foregroundStyle(colorSchemeContrast == .increased ? Color.primary : Color.red)
+                .padding(.leading, dynamicTypeSize.isAccessibilitySize ? 0 : 40)
             }
         }
+    }
+
+    private var badge: some View {
+        SeriesBadge(index: index, color: color)
+            .padding(.top, 4)
+            .accessibilityHidden(true)
+    }
+
+    private var expressionField: some View {
+        TextField(exprPlaceholder, text: $text, axis: .vertical)
+            .environment(\.layoutDirection, .leftToRight)
+            .textFieldStyle(.plain)
+            .font(.body.monospaced())
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(.tertiarySystemBackground))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        focusedID == entryID ? color.opacity(0.6) : Color.secondary.opacity(0.15),
+                        lineWidth: focusedID == entryID ? 1.5 : 1
+                    )
+            )
+            .lineLimit(1...4)
+            .focused($focusedID, equals: entryID)
+            .submitLabel(.done)
+            .autocorrectionDisabled(true)
+            .textInputAutocapitalization(.never)
+            .accessibilityLabel(Text(verbatim: "\(String(localized: "Transfer Functions")) \(index)"))
+    }
+
+    private var deleteButton: some View {
+        Button(role: .destructive, action: onDelete) {
+            Image(systemName: "minus.circle.fill")
+                .font(.title3)
+                .foregroundStyle(colorSchemeContrast == .increased ? Color.primary : Color.red.opacity(0.85))
+                .symbolRenderingMode(.hierarchical)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+        .accessibilityLabel(Text(verbatim: "\(String(localized: "Delete")) G\(index)"))
     }
 }
 
@@ -983,6 +1052,9 @@ struct ExprRowView: View {
 struct ContentView: View {
 
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage("bode_exprsJSON")      private var exprsJSON: String = ""
     @AppStorage("bode_wStartExp")      private var wStartExp: Double = -2
     @AppStorage("bode_wEndExp")        private var wEndExp: Double = 2
@@ -1042,6 +1114,7 @@ struct ContentView: View {
         .onChange(of: wStartExp) { _, _ in scheduleRecalc() }
         .onChange(of: wEndExp)   { _, _ in scheduleRecalc() }
         .onChange(of: points)    { _, _ in scheduleRecalc() }
+        .onChange(of: colorSchemeContrast) { _, _ in scheduleRecalc() }
         .reviewPrompt()
     }
 
@@ -1057,7 +1130,7 @@ struct ContentView: View {
                     ExprRowView(
                         index: idx + 1,
                         text: $entries[idx].text,
-                        color: seriesColors[entry.colorIndex % seriesColors.count],
+                        color: seriesColor(index: entry.colorIndex, highContrast: colorSchemeContrast == .increased),
                         error: allSeries.first(where: { $0.id == entry.id })?.errorMessage,
                         canDelete: entries.count > 1,
                         onDelete: { deleteEntry(at: idx) },
@@ -1101,7 +1174,7 @@ struct ContentView: View {
 
     private var addExpressionButton: some View {
         Button {
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85)) {
                 addEntry()
             }
         } label: {
@@ -1114,7 +1187,7 @@ struct ContentView: View {
 
     private var clearAllButton: some View {
         Button(role: .destructive) {
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
                 entries = [ExprEntry(colorIndex: 0)]
                 focusedID = nil
             }
@@ -1137,11 +1210,12 @@ struct ContentView: View {
                     )
             } else {
                 if activeSeries.count > 1 {
-                    ChartLegendView(items: activeSeries.enumerated().map { idx, s in
+                    ChartLegendView(items: activeSeries.map { s in
                         ChartLegendView.Item(
                             id: s.id,
-                            label: "G" + subscriptDigits(idx + 1),
-                            color: s.color
+                            label: s.label,
+                            color: s.color,
+                            colorIndex: s.colorIndex
                         )
                     })
                     .padding(.horizontal, 14)
@@ -1165,28 +1239,39 @@ struct ContentView: View {
     private var advancedSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85)) {
                     isAdvancedOpen.toggle()
                 }
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text("Advanced Settings")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.forward")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isAdvancedOpen ? (layoutDirection == .rightToLeft ? -90 : 90) : 0))
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                advancedSettingsIcon
+                                Spacer()
+                                advancedSettingsChevron
+                            }
+                            Text("Advanced Settings")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                    } else {
+                        HStack(spacing: 8) {
+                            advancedSettingsIcon
+                            Text("Advanced Settings")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            advancedSettingsChevron
+                        }
+                    }
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isAdvancedOpen ? Text("Expanded") : Text("Collapsed"))
 
             if isAdvancedOpen {
                 Divider()
@@ -1212,7 +1297,7 @@ struct ContentView: View {
                               format: "%.0f", width: 60)
 
                     Button {
-                        withAnimation { resetAdvancedSettings() }
+                        withAnimation(reduceMotion ? nil : .default) { resetAdvancedSettings() }
                     } label: {
                         Label("Reset to Defaults", systemImage: "arrow.counterclockwise")
                             .font(.callout.weight(.medium))
@@ -1233,6 +1318,21 @@ struct ContentView: View {
         )
     }
 
+    private var advancedSettingsIcon: some View {
+        Image(systemName: "slider.horizontal.3")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+    }
+
+    private var advancedSettingsChevron: some View {
+        Image(systemName: "chevron.forward")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .rotationEffect(.degrees(isAdvancedOpen ? (layoutDirection == .rightToLeft ? -90 : 90) : 0))
+            .accessibilityHidden(true)
+    }
+
     @ViewBuilder
     private func sliderRow(labelKey: LocalizedStringKey,
                            value: Binding<Double>,
@@ -1251,6 +1351,8 @@ struct ContentView: View {
                     .frame(minWidth: width, alignment: .trailing)
             }
             Slider(value: value, in: range, step: step)
+                .accessibilityLabel(Text(labelKey))
+                .accessibilityValue(Text(verbatim: String(format: format, locale: .current, value.wrappedValue)))
         }
     }
 
@@ -1265,7 +1367,7 @@ struct ContentView: View {
 
     private func deleteEntry(at idx: Int) {
         guard entries.indices.contains(idx) else { return }
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85)) {
             entries.remove(at: idx)
             if entries.isEmpty { entries = [ExprEntry(colorIndex: 0)] }
         }
@@ -1311,12 +1413,12 @@ struct ContentView: View {
         let end   = max(wEndExp,   wStartExp + 0.5)
 
         allSeries = entries.enumerated().map { idx, entry in
-            let color = seriesColors[entry.colorIndex % seriesColors.count]
+            let color = seriesColor(index: entry.colorIndex, highContrast: colorSchemeContrast == .increased)
             let label = "G" + subscriptDigits(idx + 1)
             let trimmed = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !trimmed.isEmpty else {
-                return BodeSeries(id: entry.id, color: color, label: label,
+                return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
                                   bodeData: [], errorMessage: nil)
             }
 
@@ -1332,11 +1434,11 @@ struct ContentView: View {
                     $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite
                 }
                 if filtered.isEmpty {
-                    return BodeSeries(id: entry.id, color: color, label: label,
+                    return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
                                       bodeData: [],
                                       errorMessage: String(localized: "Result is NaN or infinity"))
                 }
-                return BodeSeries(id: entry.id, color: color, label: label,
+                return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
                                   bodeData: filtered, errorMessage: nil)
             } catch {
                 do {
@@ -1349,15 +1451,15 @@ struct ContentView: View {
                         $0.logW.isFinite && $0.magDB.isFinite && $0.phaseDeg.isFinite
                     }
                     if filtered.isEmpty {
-                        return BodeSeries(id: entry.id, color: color, label: label,
+                        return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
                                           bodeData: [],
                                           errorMessage: String(localized: "Result is NaN or infinity"))
                     }
-                    return BodeSeries(id: entry.id, color: color, label: label,
+                    return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
                                       bodeData: filtered, errorMessage: nil)
                 } catch {
                     let msg = (error as? LocalizedError)?.errorDescription ?? "\(error)"
-                    return BodeSeries(id: entry.id, color: color, label: label,
+                    return BodeSeries(id: entry.id, color: color, colorIndex: entry.colorIndex, label: label,
                                       bodeData: [], errorMessage: msg)
                 }
             }
@@ -1375,21 +1477,41 @@ struct ContentView: View {
 //  セクションヘッダー
 // =====================================================
 struct SectionHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let titleKey: LocalizedStringKey
     let systemImage: String
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: systemImage)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(titleKey)
-                .font(.subheadline.weight(.semibold))
-                .textCase(.uppercase)
-                .foregroundStyle(.secondary)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    headerIcon
+                    headerText
+                }
+            } else {
+                HStack(spacing: 8) {
+                    headerIcon
+                    headerText
+                }
+            }
         }
         .padding(.horizontal, 6)
         .padding(.bottom, 6)
+    }
+
+    private var headerIcon: some View {
+        Image(systemName: systemImage)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+    }
+
+    private var headerText: some View {
+        Text(titleKey)
+            .font(.subheadline.weight(.semibold))
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -1397,6 +1519,8 @@ struct SectionHeader: View {
 //  Charts（ゲイン/位相）
 // =====================================================
 struct BodeChartsView: View {
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var distinguishWithoutColor
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let series: [BodeSeries]
     let wStartExp: Double
     let wEndExp: Double
@@ -1416,14 +1540,15 @@ struct BodeChartsView: View {
             chartCard(titleKey: "Magnitude", subtitle: gainAxisLabel) {
                 Chart {
                     ForEach(series) { s in
+                        let stroke = seriesStroke(index: s.colorIndex, distinguishWithoutColor: distinguishWithoutColor, width: 2.2)
                         ForEach(s.bodeData.sorted { $0.logW < $1.logW }) { p in
                             LineMark(
                                 x: .value("logW", p.logW),
                                 y: .value("Mag(dB)", p.magDB),
-                                series: .value("Series", s.id.uuidString)
+                                series: .value("Series", s.label)
                             )
                             .foregroundStyle(s.color)
-                            .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                            .lineStyle(stroke)
                             .interpolationMethod(.catmullRom)
                         }
                     }
@@ -1433,19 +1558,21 @@ struct BodeChartsView: View {
                 .chartXAxis { bodeXAxis(startExp: wStartExp, endExp: wEndExp) }
                 .chartYAxis { AxisMarks(position: .leading) }
                 .chartLegend(.hidden)
+                .accessibilityLabel("Magnitude")
             }
 
             chartCard(titleKey: "Phase", subtitle: phaseAxisLabel) {
                 Chart {
                     ForEach(series) { s in
+                        let stroke = seriesStroke(index: s.colorIndex, distinguishWithoutColor: distinguishWithoutColor, width: 2.2)
                         ForEach(s.bodeData.sorted { $0.logW < $1.logW }) { p in
                             LineMark(
                                 x: .value("logW", p.logW),
                                 y: .value("Phase(deg)", p.phaseDeg),
-                                series: .value("Series", s.id.uuidString)
+                                series: .value("Series", s.label)
                             )
                             .foregroundStyle(s.color)
-                            .lineStyle(StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round))
+                            .lineStyle(stroke)
                             .interpolationMethod(.catmullRom)
                         }
                     }
@@ -1468,6 +1595,7 @@ struct BodeChartsView: View {
                     }
                 }
                 .chartLegend(.hidden)
+                .accessibilityLabel("Phase")
             }
         }
     }
@@ -1477,13 +1605,23 @@ struct BodeChartsView: View {
                                           subtitle: String,
                                           @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(titleKey)
-                    .font(.headline)
-                Spacer()
-                Text(verbatim: subtitle)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(titleKey)
+                        .font(.headline)
+                    Text(verbatim: subtitle)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(titleKey)
+                        .font(.headline)
+                    Spacer()
+                    Text(verbatim: subtitle)
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
             }
             content()
         }
