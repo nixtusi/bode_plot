@@ -955,6 +955,61 @@ struct EmptyChartHintView: View {
 // =====================================================
 //  1行分の式入力ビュー
 // =====================================================
+private struct KeyboardDismissObserver: UIViewRepresentable {
+    let dismiss: () -> Void
+
+    func makeUIView(context: Context) -> ObserverView {
+        let view = ObserverView()
+        view.dismiss = dismiss
+        return view
+    }
+
+    func updateUIView(_ view: ObserverView, context: Context) {
+        view.dismiss = dismiss
+    }
+
+    static func dismantleUIView(_ view: ObserverView, coordinator: ()) {
+        view.removeObserver()
+    }
+
+    final class ObserverView: UIView, UIGestureRecognizerDelegate {
+        var dismiss: () -> Void = {}
+        private weak var observedWindow: UIWindow?
+        private lazy var tap = UITapGestureRecognizer(target: self, action: #selector(didTap))
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            removeObserver()
+            guard let window else { return }
+            tap.cancelsTouchesInView = false
+            tap.delegate = self
+            window.addGestureRecognizer(tap)
+            observedWindow = window
+        }
+
+        func removeObserver() {
+            observedWindow?.removeGestureRecognizer(tap)
+            observedWindow = nil
+        }
+
+        @objc private func didTap() { dismiss() }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            var view = touch.view
+            while let current = view {
+                if current is UITextField || current is UITextView { return false }
+                view = current.superview
+            }
+            return true
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
+        }
+    }
+}
+
 struct ExprRowView: View {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -1081,7 +1136,7 @@ struct ContentView: View {
                     chartSection
                     advancedSection
 
-                    Text("Horizontal axis is angular frequency ω on a logarithmic scale (log₁₀ω).")
+                    Text("Horizontal axis is angular frequency ω[rad/s] on a logarithmic scale (log₁₀ω).")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.top, 4)
@@ -1092,16 +1147,7 @@ struct ContentView: View {
             .navigationTitle("Bode Plot")
             .navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button {
-                        focusedID = nil
-                    } label: {
-                        Text("Done").bold()
-                    }
-                }
-            }
+            .background(KeyboardDismissObserver { focusedID = nil }.frame(width: 0, height: 0))
         }
         .onAppear {
             loadEntries()

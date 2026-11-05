@@ -5798,343 +5798,343 @@
         }
       }
     },
-    "Horizontal axis is angular frequency ω on a logarithmic scale (log₁₀ω).": {
+    "Horizontal axis is angular frequency ω[rad/s] on a logarithmic scale (log₁₀ω).": {
       "extractionState": "manual",
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "横軸は角周波数 ω の対数目盛 (log₁₀ω) で表示しています。"
+            "value": "横軸は角周波数 ω[rad/s] の対数目盛 (log₁₀ω) で表示しています。"
           }
         },
         "ar": {
           "stringUnit": {
             "state": "translated",
-            "value": "يمثل المحور الأفقي التردد الزاوي ω بمقياس لوغاريتمي (log₁₀ω)."
+            "value": "يمثل المحور الأفقي التردد الزاوي ω[rad/s] بمقياس لوغاريتمي (log₁₀ω)."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sumbu horizontal menunjukkan frekuensi sudut ω pada skala logaritmik (log₁₀ω)."
+            "value": "Sumbu horizontal menunjukkan frekuensi sudut ω[rad/s] pada skala logaritmik (log₁₀ω)."
           }
         },
         "vi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Trục ngang là tần số góc ω theo thang logarit (log₁₀ω)."
+            "value": "Trục ngang là tần số góc ω[rad/s] theo thang logarit (log₁₀ω)."
           }
         },
         "th": {
           "stringUnit": {
             "state": "translated",
-            "value": "แกนนอนคือความถี่เชิงมุม ω บนสเกลลอการิทึม (log₁₀ω)"
+            "value": "แกนนอนคือความถี่เชิงมุม ω[rad/s] บนสเกลลอการิทึม (log₁₀ω)"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Die horizontale Achse zeigt die Kreisfrequenz ω auf einer logarithmischen Skala (log₁₀ω)."
+            "value": "Die horizontale Achse zeigt die Kreisfrequenz ω[rad/s] auf einer logarithmischen Skala (log₁₀ω)."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’axe horizontal représente la pulsation ω sur une échelle logarithmique (log₁₀ω)."
+            "value": "L’axe horizontal représente la pulsation ω[rad/s] sur une échelle logarithmique (log₁₀ω)."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "El eje horizontal representa la frecuencia angular ω en escala logarítmica (log₁₀ω)."
+            "value": "El eje horizontal representa la frecuencia angular ω[rad/s] en escala logarítmica (log₁₀ω)."
           }
         },
         "it": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’asse orizzontale rappresenta la pulsazione ω su scala logaritmica (log₁₀ω)."
+            "value": "L’asse orizzontale rappresenta la pulsazione ω[rad/s] su scala logaritmica (log₁₀ω)."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "O eixo horizontal representa a frequência angular ω em escala logarítmica (log₁₀ω)."
+            "value": "O eixo horizontal representa a frequência angular ω[rad/s] em escala logarítmica (log₁₀ω)."
           }
         },
         "nl": {
           "stringUnit": {
             "state": "translated",
-            "value": "De horizontale as toont de hoekfrequentie ω op een logaritmische schaal (log₁₀ω)."
+            "value": "De horizontale as toont de hoekfrequentie ω[rad/s] op een logaritmische schaal (log₁₀ω)."
           }
         },
         "pl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Oś pozioma przedstawia częstotliwość kątową ω w skali logarytmicznej (log₁₀ω)."
+            "value": "Oś pozioma przedstawia częstotliwość kątową ω[rad/s] w skali logarytmicznej (log₁₀ω)."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "На горизонтальной оси угловая частота ω показана в логарифмическом масштабе (log₁₀ω)."
+            "value": "На горизонтальной оси угловая частота ω[rad/s] показана в логарифмическом масштабе (log₁₀ω)."
           }
         },
         "pt-PT": {
           "stringUnit": {
             "state": "translated",
-            "value": "O eixo horizontal representa a frequência angular ω em escala logarítmica (log₁₀ω)."
+            "value": "O eixo horizontal representa a frequência angular ω[rad/s] em escala logarítmica (log₁₀ω)."
           }
         },
         "sv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Den horisontella axeln visar vinkelfrekvensen ω på en logaritmisk skala (log₁₀ω)."
+            "value": "Den horisontella axeln visar vinkelfrekvensen ω[rad/s] på en logaritmisk skala (log₁₀ω)."
           }
         },
         "da": {
           "stringUnit": {
             "state": "translated",
-            "value": "Den vandrette akse viser vinkelfrekvensen ω på en logaritmisk skala (log₁₀ω)."
+            "value": "Den vandrette akse viser vinkelfrekvensen ω[rad/s] på en logaritmisk skala (log₁₀ω)."
           }
         },
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Den vannrette aksen viser vinkelfrekvensen ω på en logaritmisk skala (log₁₀ω)."
+            "value": "Den vannrette aksen viser vinkelfrekvensen ω[rad/s] på en logaritmisk skala (log₁₀ω)."
           }
         },
         "fi": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vaaka-akseli näyttää kulmataajuuden ω logaritmisella asteikolla (log₁₀ω)."
+            "value": "Vaaka-akseli näyttää kulmataajuuden ω[rad/s] logaritmisella asteikolla (log₁₀ω)."
           }
         },
         "tr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Yatay eksen açısal frekans ω değerini logaritmik ölçekte gösterir (log₁₀ω)."
+            "value": "Yatay eksen açısal frekans ω[rad/s] değerini logaritmik ölçekte gösterir (log₁₀ω)."
           }
         },
         "cs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vodorovná osa zobrazuje úhlovou frekvenci ω v logaritmickém měřítku (log₁₀ω)."
+            "value": "Vodorovná osa zobrazuje úhlovou frekvenci ω[rad/s] v logaritmickém měřítku (log₁₀ω)."
           }
         },
         "sk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vodorovná os zobrazuje uhlovú frekvenciu ω v logaritmickej mierke (log₁₀ω)."
+            "value": "Vodorovná os zobrazuje uhlovú frekvenciu ω[rad/s] v logaritmickej mierke (log₁₀ω)."
           }
         },
         "hu": {
           "stringUnit": {
             "state": "translated",
-            "value": "A vízszintes tengely az ω körfrekvenciát mutatja logaritmikus skálán (log₁₀ω)."
+            "value": "A vízszintes tengely az ω[rad/s] körfrekvenciát mutatja logaritmikus skálán (log₁₀ω)."
           }
         },
         "ro": {
           "stringUnit": {
             "state": "translated",
-            "value": "Axa orizontală arată frecvența unghiulară ω pe o scară logaritmică (log₁₀ω)."
+            "value": "Axa orizontală arată frecvența unghiulară ω[rad/s] pe o scară logaritmică (log₁₀ω)."
           }
         },
         "el": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ο οριζόντιος άξονας δείχνει τη γωνιακή συχνότητα ω σε λογαριθμική κλίμακα (log₁₀ω)."
+            "value": "Ο οριζόντιος άξονας δείχνει τη γω[rad/s]νιακή συχνότητα ω σε λογαριθμική κλίμακα (log₁₀ω)."
           }
         },
         "uk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Горизонтальна вісь показує кутову частоту ω в логарифмічному масштабі (log₁₀ω)."
+            "value": "Горизонтальна вісь показує кутову частоту ω[rad/s] в логарифмічному масштабі (log₁₀ω)."
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "가로축은 로그 눈금의 각주파수 ω입니다 (log₁₀ω)."
+            "value": "가로축은 로그 눈금의 각주파수 ω[rad/s]입니다 (log₁₀ω)."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "横轴为对数刻度的角频率 ω（log₁₀ω）。"
+            "value": "横轴为对数刻度的角频率 ω[rad/s]（log₁₀ω）。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "橫軸為對數刻度的角頻率 ω（log₁₀ω）。"
+            "value": "橫軸為對數刻度的角頻率 ω[rad/s]（log₁₀ω）。"
           }
         },
         "hi": {
           "stringUnit": {
             "state": "translated",
-            "value": "क्षैतिज अक्ष लघुगणकीय पैमाने पर कोणीय आवृत्ति ω है (log₁₀ω)।"
+            "value": "क्षैतिज अक्ष लघुगणकीय पैमाने पर कोणीय आवृत्ति ω[rad/s] है (log₁₀ω)।"
           }
         },
         "bn": {
           "stringUnit": {
             "state": "translated",
-            "value": "অনুভূমিক অক্ষ লগারিদমিক স্কেলে কৌণিক কম্পাঙ্ক ω (log₁₀ω)।"
+            "value": "অনুভূমিক অক্ষ লগারিদমিক স্কেলে কৌণিক কম্পাঙ্ক ω[rad/s] (log₁₀ω)।"
           }
         },
         "ur": {
           "stringUnit": {
             "state": "translated",
-            "value": "افقی محور لوگارتھمی پیمانے پر زاویائی تعدد ω ہے (log₁₀ω)۔"
+            "value": "افقی محور لوگارتھمی پیمانے پر زاویائی تعدد ω[rad/s] ہے (log₁₀ω)۔"
           }
         },
         "ta": {
           "stringUnit": {
             "state": "translated",
-            "value": "கிடைமட்ட அச்சு மடக்கை அளவில் கோண அதிர்வெண் ω ஆகும் (log₁₀ω)."
+            "value": "கிடைமட்ட அச்சு மடக்கை அளவில் கோண அதிர்வெண் ω[rad/s] ஆகும் (log₁₀ω)."
           }
         },
         "te": {
           "stringUnit": {
             "state": "translated",
-            "value": "క్షితిజ సమాంతర అక్షం సంవర్గమాన ప్రమాణంలో కోణీయ పౌనఃపున్యం ω (log₁₀ω)."
+            "value": "క్షితిజ సమాంతర అక్షం సంవర్గమాన ప్రమాణంలో కోణీయ పౌనఃపున్యం ω[rad/s] (log₁₀ω)."
           }
         },
         "mr": {
           "stringUnit": {
             "state": "translated",
-            "value": "आडवा अक्ष लघुगणकीय मापनावरील कोनीय वारंवारता ω आहे (log₁₀ω)."
+            "value": "आडवा अक्ष लघुगणकीय मापनावरील कोनीय वारंवारता ω[rad/s] आहे (log₁₀ω)."
           }
         },
         "gu": {
           "stringUnit": {
             "state": "translated",
-            "value": "આડું અક્ષ લઘુગણકીય સ્કેલ પર કોણીય આવર્તન ω છે (log₁₀ω)."
+            "value": "આડું અક્ષ લઘુગણકીય સ્કેલ પર કોણીય આવર્તન ω[rad/s] છે (log₁₀ω)."
           }
         },
         "pa": {
           "stringUnit": {
             "state": "translated",
-            "value": "ਹਰੀਜੱਟਲ ਧੁਰਾ ਲਘੂਗਣਕੀ ਪੈਮਾਨੇ ਉੱਤੇ ਕੋਣੀ ਬਾਰੰਬਾਰਤਾ ω ਹੈ (log₁₀ω)।"
+            "value": "ਹਰੀਜੱਟਲ ਧੁਰਾ ਲਘੂਗਣਕੀ ਪੈਮਾਨੇ ਉੱਤੇ ਕੋਣੀ ਬਾਰੰਬਾਰਤਾ ω[rad/s] ਹੈ (log₁₀ω)।"
           }
         },
         "ml": {
           "stringUnit": {
             "state": "translated",
-            "value": "തിരശ്ചീന അക്ഷം ലോഗരിതമിക് സ്കെയിലിലെ കോണീയ ആവൃത്തി ω ആണ് (log₁₀ω)."
+            "value": "തിരശ്ചീന അക്ഷം ലോഗരിതമിക് സ്കെയിലിലെ കോണീയ ആവൃത്തി ω[rad/s] ആണ് (log₁₀ω)."
           }
         },
         "kn": {
           "stringUnit": {
             "state": "translated",
-            "value": "ಅಡ್ಡ ಅಕ್ಷವು ಲಘುಗಣಕ ಪ್ರಮಾಣದಲ್ಲಿನ ಕೋನೀಯ ಆವೃತ್ತಿ ω ಆಗಿದೆ (log₁₀ω)."
+            "value": "ಅಡ್ಡ ಅಕ್ಷವು ಲಘುಗಣಕ ಪ್ರಮಾಣದಲ್ಲಿನ ಕೋನೀಯ ಆವೃತ್ತಿ ω[rad/s] ಆಗಿದೆ (log₁₀ω)."
           }
         },
         "ms": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paksi mendatar ialah frekuensi sudut ω pada skala logaritma (log₁₀ω)."
+            "value": "Paksi mendatar ialah frekuensi sudut ω[rad/s] pada skala logaritma (log₁₀ω)."
           }
         },
         "fil": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ang pahalang na axis ay angular frequency ω sa logarithmic scale (log₁₀ω)."
+            "value": "Ang pahalang na axis ay angular frequency ω[rad/s] sa logarithmic scale (log₁₀ω)."
           }
         },
         "sw": {
           "stringUnit": {
             "state": "translated",
-            "value": "Mhimili mlalo unaonyesha frekwensi ya angular ω katika skeli ya logaritimu (log₁₀ω)."
+            "value": "Mhimili mlalo unaonyesha frekwensi ya angular ω[rad/s] katika skeli ya logaritimu (log₁₀ω)."
           }
         },
         "he": {
           "stringUnit": {
             "state": "translated",
-            "value": "הציר האופקי הוא התדר הזוויתי ω בסולם לוגריתמי (log₁₀ω)."
+            "value": "הציר האופקי הוא התדר הזוויתי ω[rad/s] בסולם לוגריתמי (log₁₀ω)."
           }
         },
         "bg": {
           "stringUnit": {
             "state": "translated",
-            "value": "Хоризонталната ос е ъгловата честота ω в логаритмична скала (log₁₀ω)."
+            "value": "Хоризонталната ос е ъгловата честота ω[rad/s] в логаритмична скала (log₁₀ω)."
           }
         },
         "hr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vodoravna os prikazuje kutnu frekvenciju ω na logaritamskoj ljestvici (log₁₀ω)."
+            "value": "Vodoravna os prikazuje kutnu frekvenciju ω[rad/s] na logaritamskoj ljestvici (log₁₀ω)."
           }
         },
         "sr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Хоризонтална оса приказује угаону фреквенцију ω на логаритамској скали (log₁₀ω)."
+            "value": "Хоризонтална оса приказује угаону фреквенцију ω[rad/s] на логаритамској скали (log₁₀ω)."
           }
         },
         "ca": {
           "stringUnit": {
             "state": "translated",
-            "value": "L'eix horitzontal és la freqüència angular ω en escala logarítmica (log₁₀ω)."
+            "value": "L'eix horitzontal és la freqüència angular ω[rad/s] en escala logarítmica (log₁₀ω)."
           }
         },
         "fa": {
           "stringUnit": {
             "state": "translated",
-            "value": "محور افقی فرکانس زاویه‌ای ω را در مقیاس لگاریتمی (log₁₀ω) نشان می‌دهد."
+            "value": "محور افقی فرکانس زاویه‌ای ω[rad/s] را در مقیاس لگاریتمی (log₁₀ω) نشان می‌دهد."
           }
         },
         "sl": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vodoravna os prikazuje kotno frekvenco ω na logaritemski lestvici (log₁₀ω)."
+            "value": "Vodoravna os prikazuje kotno frekvenco ω[rad/s] na logaritemski lestvici (log₁₀ω)."
           }
         },
         "lt": {
           "stringUnit": {
             "state": "translated",
-            "value": "Horizontalioji ašis rodo kampinį dažnį ω logaritminėje skalėje (log₁₀ω)."
+            "value": "Horizontalioji ašis rodo kampinį dažnį ω[rad/s] logaritminėje skalėje (log₁₀ω)."
           }
         },
         "lv": {
           "stringUnit": {
             "state": "translated",
-            "value": "Horizontālā ass rāda leņķisko frekvenci ω logaritmiskā skalā (log₁₀ω)."
+            "value": "Horizontālā ass rāda leņķisko frekvenci ω[rad/s] logaritmiskā skalā (log₁₀ω)."
           }
         },
         "et": {
           "stringUnit": {
             "state": "translated",
-            "value": "Horisontaaltelg näitab nurksagedust ω logaritmilisel skaalal (log₁₀ω)."
+            "value": "Horisontaaltelg näitab nurksagedust ω[rad/s] logaritmilisel skaalal (log₁₀ω)."
           }
         },
         "is": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lárétti ásinn sýnir horntíðni ω á logra kvarða (log₁₀ω)."
+            "value": "Lárétti ásinn sýnir horntíðni ω[rad/s] á logra kvarða (log₁₀ω)."
           }
         },
         "bs": {
           "stringUnit": {
             "state": "translated",
-            "value": "Horizontalna osa prikazuje ugaonu frekvenciju ω na logaritamskoj skali (log₁₀ω)."
+            "value": "Horizontalna osa prikazuje ugaonu frekvenciju ω[rad/s] na logaritamskoj skali (log₁₀ω)."
           }
         },
         "mk": {
           "stringUnit": {
             "state": "translated",
-            "value": "Хоризонталната оска ја прикажува аголната фреквенција ω на логаритамска скала (log₁₀ω)."
+            "value": "Хоризонталната оска ја прикажува аголната фреквенција ω[rad/s] на логаритамска скала (log₁₀ω)."
           }
         },
         "sq": {
           "stringUnit": {
             "state": "translated",
-            "value": "Boshti horizontal tregon frekuencën këndore ω në shkallë logaritmike (log₁₀ω)."
+            "value": "Boshti horizontal tregon frekuencën këndore ω[rad/s] në shkallë logaritmike (log₁₀ω)."
           }
         },
         "az": {
           "stringUnit": {
             "state": "translated",
-            "value": "Üfüqi ox bucaq tezliyi ω-nı loqarifmik miqyasda göstərir (log₁₀ω)."
+            "value": "Üfüqi ox bucaq tezliyi ω[rad/s]-nı loqarifmik miqyasda göstərir (log₁₀ω)."
           }
         }
       }
